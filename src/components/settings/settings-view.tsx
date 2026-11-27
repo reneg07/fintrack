@@ -1,11 +1,20 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
-import { Clock, DollarSign, LogOut, ShieldCheck, User } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import {
+  Clock,
+  DollarSign,
+  Loader2,
+  LogOut,
+  ShieldCheck,
+  User,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -16,31 +25,89 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { DemoNotice } from "@/components/shared/demo-notice";
 import { PageHeader } from "@/components/shared/page-header";
-import { DEMO_USER } from "@/lib/demo-data";
+import {
+  updateProfileSchema,
+  type UpdateProfileValues,
+} from "@/schemas/profile.schema";
+import type { UserProfile } from "@/types/domain";
 
-export function SettingsView() {
-  const [fullName, setFullName] = useState(DEMO_USER.fullName);
+interface SettingsViewProps {
+  profile: UserProfile;
+}
 
-  function handleProfilePreviewSubmit(
-    event: React.FormEvent<HTMLFormElement>,
-  ) {
-    event.preventDefault();
-    toast.info("Edición de perfil verificada (Fase 02)", {
-      description:
-        "La actualización real en la tabla profiles de Supabase se conectará en la Fase 04.",
-    });
+export function SettingsView({ profile }: SettingsViewProps) {
+  const router = useRouter();
+  const [signingOut, setSigningOut] = useState(false);
+
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors, isSubmitting, isDirty },
+  } = useForm<UpdateProfileValues>({
+    resolver: zodResolver(updateProfileSchema),
+    mode: "onTouched",
+    shouldFocusError: true,
+    defaultValues: {
+      fullName: profile.fullName,
+    },
+  });
+
+  async function onSubmit(values: UpdateProfileValues) {
+    try {
+      const response = await fetch("/api/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fullName: values.fullName }),
+      });
+
+      const payload = (await response.json()) as {
+        data?: { fullName?: string } | null;
+        error?: { message?: string } | null;
+      };
+
+      if (!response.ok || !payload.data) {
+        toast.error(
+          payload.error?.message ?? "No se pudo actualizar tu perfil.",
+        );
+        return;
+      }
+
+      const updatedName = payload.data.fullName ?? values.fullName;
+      reset({ fullName: updatedName });
+      toast.success("Perfil actualizado correctamente");
+      router.refresh();
+    } catch {
+      toast.error("Error de red al guardar los cambios del perfil.");
+    }
+  }
+
+  async function handleSignOut() {
+    if (signingOut) return;
+    setSigningOut(true);
+    try {
+      const response = await fetch("/api/auth/signout", { method: "POST" });
+      if (!response.ok) {
+        toast.error("No se pudo cerrar la sesión.");
+        return;
+      }
+      toast.success("Sesión cerrada correctamente");
+      router.replace("/login");
+      router.refresh();
+    } catch {
+      toast.error("Error de red al cerrar la sesión.");
+    } finally {
+      setSigningOut(false);
+    }
   }
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Configuración"
-        description="Administra la información básica de tu perfil, preferencias regionales y gestión de sesión."
+        description="Administra la información de tu perfil, preferencias regionales y sesión activa."
       />
-
-      <DemoNotice />
 
       <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
         {/* Profile Card */}
@@ -65,7 +132,8 @@ export function SettingsView() {
           </CardHeader>
           <CardContent>
             <form
-              onSubmit={handleProfilePreviewSubmit}
+              onSubmit={handleSubmit(onSubmit)}
+              noValidate
               className="space-y-4"
             >
               <div className="space-y-1.5">
@@ -73,12 +141,23 @@ export function SettingsView() {
                 <Input
                   id="settings-fullname"
                   type="text"
-                  value={fullName}
-                  onChange={(event) => setFullName(event.target.value)}
                   autoComplete="name"
-                  required
+                  disabled={isSubmitting}
+                  aria-invalid={errors.fullName ? "true" : "false"}
+                  aria-describedby={
+                    errors.fullName ? "settings-fullname-error" : undefined
+                  }
                   className="h-10 bg-white"
+                  {...register("fullName")}
                 />
+                {errors.fullName && (
+                  <p
+                    id="settings-fullname-error"
+                    className="text-xs font-medium text-danger-text"
+                  >
+                    {errors.fullName.message}
+                  </p>
+                )}
               </div>
 
               <div className="space-y-1.5">
@@ -86,19 +165,33 @@ export function SettingsView() {
                 <Input
                   id="settings-email"
                   type="email"
-                  value={DEMO_USER.email}
+                  value={profile.email}
                   disabled
                   className="h-10 bg-secondary/60 text-muted-foreground"
                 />
                 <p className="text-xs text-muted-foreground">
-                  El correo de acceso será gestionado por Supabase Auth a partir
-                  de la Fase 03.
+                  El correo de acceso es administrado por tu cuenta de Supabase
+                  Auth.
                 </p>
               </div>
 
               <div className="pt-2">
-                <Button type="submit" className="h-9 px-4">
-                  Guardar cambios
+                <Button
+                  type="submit"
+                  disabled={isSubmitting || !isDirty}
+                  className="h-9 px-4"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2
+                        className="size-4 animate-spin"
+                        aria-hidden="true"
+                      />
+                      Guardando...
+                    </>
+                  ) : (
+                    "Guardar cambios"
+                  )}
                 </Button>
               </div>
             </form>
@@ -113,7 +206,7 @@ export function SettingsView() {
                 Preferencias regionales
               </CardTitle>
               <CardDescription>
-                Configuración fija del producto para consistencia contable.
+                Configuración estándar de FinTrack para consistencia contable.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -136,7 +229,7 @@ export function SettingsView() {
                   variant="outline"
                   className="border-emerald-200 bg-emerald-50 font-mono text-success-text"
                 >
-                  {DEMO_USER.currency}
+                  {profile.currency}
                 </Badge>
               </div>
 
@@ -158,7 +251,7 @@ export function SettingsView() {
                   </div>
                 </div>
                 <Badge variant="secondary" className="font-mono text-xs">
-                  {DEMO_USER.timezone}
+                  {profile.timezone}
                 </Badge>
               </div>
             </CardContent>
@@ -176,32 +269,25 @@ export function SettingsView() {
                 </CardTitle>
               </div>
               <CardDescription>
-                En Fase 02 esta vista no mantiene ninguna sesión activa real.
-                Las sesiones HTTP seguras y el cierre de sesión real se
-                habilitarán en Fase 03.
+                Tu sesión está protegida por cookies HTTP y verificada en el
+                servidor en cada solicitud.
               </CardDescription>
             </CardHeader>
-            <CardContent className="flex flex-wrap items-center gap-2.5">
+            <CardContent>
               <Button
                 type="button"
                 variant="outline"
+                disabled={signingOut}
                 className="border-red-200 text-danger-text hover:bg-red-50 hover:text-danger-text"
-                onClick={() =>
-                  toast.info("Cierre de sesión disponible en Fase 03", {
-                    description:
-                      "No existe una sesión autenticada activa durante la Fase 02.",
-                  })
-                }
+                onClick={handleSignOut}
               >
-                <LogOut className="size-4" aria-hidden="true" />
-                Cerrar sesión
+                {signingOut ? (
+                  <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                ) : (
+                  <LogOut className="size-4" aria-hidden="true" />
+                )}
+                {signingOut ? "Cerrando sesión..." : "Cerrar sesión"}
               </Button>
-              <Link
-                href="/login"
-                className={buttonVariants({ variant: "ghost" })}
-              >
-                Ir a iniciar sesión
-              </Link>
             </CardContent>
           </Card>
         </div>

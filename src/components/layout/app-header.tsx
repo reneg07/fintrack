@@ -1,8 +1,10 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { ChevronDown, Globe, Home, LogIn, Settings } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
+import { ChevronDown, Globe, Home, Loader2, LogOut, Settings } from "lucide-react";
+import { toast } from "sonner";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -17,11 +19,44 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { MobileNav } from "@/components/layout/mobile-nav";
 import { getActiveNavItem } from "@/components/layout/nav-items";
-import { DEMO_USER } from "@/lib/demo-data";
+import type { UserProfile } from "@/types/domain";
 
-export function AppHeader() {
+function getUserInitials(fullName: string): string {
+  const parts = fullName.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "FT";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
+}
+
+interface AppHeaderProps {
+  user: UserProfile;
+}
+
+export function AppHeader({ user }: AppHeaderProps) {
   const pathname = usePathname();
+  const router = useRouter();
+  const [signingOut, setSigningOut] = useState(false);
   const activeItem = getActiveNavItem(pathname);
+  const initials = getUserInitials(user.fullName);
+
+  async function handleSignOut() {
+    if (signingOut) return;
+    setSigningOut(true);
+    try {
+      const response = await fetch("/api/auth/signout", { method: "POST" });
+      if (!response.ok) {
+        toast.error("No se pudo cerrar la sesión. Inténtalo nuevamente.");
+        return;
+      }
+      toast.success("Sesión cerrada correctamente");
+      router.replace("/login");
+      router.refresh();
+    } catch {
+      toast.error("Error de red al cerrar la sesión.");
+    } finally {
+      setSigningOut(false);
+    }
+  }
 
   return (
     <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center justify-between gap-3 border-b border-border bg-card/95 px-4 backdrop-blur-sm sm:px-6 lg:px-8">
@@ -43,7 +78,7 @@ export function AppHeader() {
           className="hidden gap-1.5 border-border bg-background px-2.5 py-1 text-xs font-medium text-muted-foreground sm:inline-flex"
         >
           <Globe className="size-3.5 text-success-text" aria-hidden="true" />
-          USD · El Salvador
+          {user.currency} · El Salvador
         </Badge>
 
         <DropdownMenu>
@@ -58,11 +93,11 @@ export function AppHeader() {
           >
             <Avatar className="size-7">
               <AvatarFallback className="bg-brand-dark text-xs font-semibold text-brand-accent">
-                EM
+                {initials}
               </AvatarFallback>
             </Avatar>
-            <span className="hidden max-w-[140px] truncate text-left text-xs font-medium text-foreground md:inline">
-              {DEMO_USER.fullName}
+            <span className="hidden max-w-[150px] truncate text-left text-xs font-medium text-foreground md:inline">
+              {user.fullName}
             </span>
             <ChevronDown
               className="size-3.5 text-muted-foreground"
@@ -73,15 +108,12 @@ export function AppHeader() {
             <DropdownMenuGroup>
               <DropdownMenuLabel className="font-normal">
                 <div className="flex flex-col space-y-0.5 py-0.5">
-                  <p className="text-sm font-semibold text-foreground">
-                    {DEMO_USER.fullName}
+                  <p className="truncate text-sm font-semibold text-foreground">
+                    {user.fullName}
                   </p>
                   <p className="truncate text-xs text-muted-foreground">
-                    {DEMO_USER.email}
+                    {user.email}
                   </p>
-                  <span className="pt-1 text-[11px] font-medium text-success-text">
-                    Perfil de demostración (Fase 02)
-                  </span>
                 </div>
               </DropdownMenuLabel>
             </DropdownMenuGroup>
@@ -92,12 +124,20 @@ export function AppHeader() {
             </DropdownMenuItem>
             <DropdownMenuItem render={<Link href="/" />}>
               <Home className="size-4" aria-hidden="true" />
-              Ir a la landing pública
+              Página pública
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem render={<Link href="/login" />}>
-              <LogIn className="size-4" aria-hidden="true" />
-              Pantalla de inicio de sesión
+            <DropdownMenuItem
+              variant="destructive"
+              disabled={signingOut}
+              onClick={handleSignOut}
+            >
+              {signingOut ? (
+                <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+              ) : (
+                <LogOut className="size-4" aria-hidden="true" />
+              )}
+              {signingOut ? "Cerrando sesión..." : "Cerrar sesión"}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

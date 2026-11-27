@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ExternalLink } from "lucide-react";
+import { ShieldCheck } from "lucide-react";
 import { BrandLogo } from "@/components/shared/brand-logo";
 import { APP_NAV_ITEMS } from "@/components/layout/nav-items";
+import type { UserProfile } from "@/types/domain";
 import { cn } from "@/lib/utils";
 
 interface SidebarNavListProps {
@@ -15,7 +16,10 @@ export function SidebarNavList({ onNavigate }: SidebarNavListProps) {
   const pathname = usePathname();
 
   return (
-    <nav aria-label="Navegación de la aplicación" className="flex-1 space-y-1 px-3 py-4">
+    <nav
+      aria-label="Navegación de la aplicación"
+      className="flex-1 space-y-1 px-3 py-4"
+    >
       <ul className="space-y-1">
         {APP_NAV_ITEMS.map((item) => {
           const isActive =
@@ -60,7 +64,11 @@ export function SidebarNavList({ onNavigate }: SidebarNavListProps) {
   );
 }
 
-export function AppSidebar() {
+interface AppSidebarProps {
+  user: UserProfile;
+}
+
+export function AppSidebar({ user }: AppSidebarProps) {
   return (
     <aside
       aria-label="Barra lateral de navegación"
@@ -79,20 +87,19 @@ export function AppSidebar() {
 
       <div className="border-t border-sidebar-border p-4">
         <div className="rounded-lg border border-white/10 bg-white/5 p-3">
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-brand-accent">
-            Vista preliminar · Fase 02
+          <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-brand-accent">
+            <ShieldCheck className="size-3.5" aria-hidden="true" />
+            Sesión protegida
+          </div>
+          <p className="mt-1.5 truncate text-xs font-medium text-white">
+            {user.fullName}
           </p>
-          <p className="mt-1 text-xs leading-relaxed text-emerald-100/75">
-            Datos ficticios para validación visual. Acceso protegido real en
-            Fase 03.
+          <p className="truncate text-[11px] text-emerald-100/70">
+            {user.email}
           </p>
-          <Link
-            href="/"
-            className="mt-2.5 inline-flex items-center gap-1 text-xs font-medium text-white underline-offset-4 hover:underline"
-          >
-            Ir a la landing pública
-            <ExternalLink className="size-3" aria-hidden="true" />
-          </Link>
+          <p className="mt-2 text-[11px] text-emerald-100/60">
+            {user.currency} · {user.timezone}
+          </p>
         </div>
       </div>
     </aside>
