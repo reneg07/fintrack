@@ -1,36 +1,48 @@
 import type { Metadata } from "next";
-import Link from "next/link";
-import { ArrowLeftRight } from "lucide-react";
-import { buttonVariants } from "@/components/ui/button";
-import { EmptyState } from "@/components/shared/empty-state";
-import { PageHeader } from "@/components/shared/page-header";
+import { TransactionsManager } from "@/components/transactions/transactions-manager";
+import { listCategoriesWithUsage } from "@/services/categories.service";
+import { listTransactions } from "@/services/transactions.service";
+import type { PaginatedTransactionsResult } from "@/types/domain";
 
 export const metadata: Metadata = {
   title: "Transacciones",
   description: "Gestión de ingresos y gastos en FinTrack.",
 };
 
-export default function TransactionsPage() {
-  return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Transacciones"
-        description="Registra, busca y filtra tus ingresos y gastos en dólares estadounidenses (USD)."
-      />
+const EMPTY_TRANSACTIONS: PaginatedTransactionsResult = {
+  items: [],
+  pagination: {
+    page: 1,
+    pageSize: 10,
+    totalCount: 0,
+    totalPages: 1,
+  },
+  totals: {
+    incomeCents: "0",
+    expenseCents: "0",
+    netCents: "0",
+    count: 0,
+  },
+};
 
-      <EmptyState
-        icon={ArrowLeftRight}
-        title="Aún no tienes transacciones registradas"
-        description="Tu cuenta comienza limpia sin datos ficticios. El registro, edición, eliminación y búsqueda de movimientos contra PostgreSQL mediante Route Handlers se habilitarán en la Fase 04."
-        action={
-          <Link
-            href="/categories"
-            className={buttonVariants({ variant: "outline" })}
-          >
-            Ver tus categorías disponibles
-          </Link>
-        }
-      />
-    </div>
+interface TransactionsPageProps {
+  searchParams: Promise<{ new?: string }>;
+}
+
+export default async function TransactionsPage({
+  searchParams,
+}: TransactionsPageProps) {
+  const params = await searchParams;
+  const [initialData, categories] = await Promise.all([
+    listTransactions({ page: 1, pageSize: 10 }).catch(() => EMPTY_TRANSACTIONS),
+    listCategoriesWithUsage().catch(() => []),
+  ]);
+
+  return (
+    <TransactionsManager
+      initialData={initialData}
+      categories={categories}
+      defaultOpenCreate={params.new === "1"}
+    />
   );
 }
