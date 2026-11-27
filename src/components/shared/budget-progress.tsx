@@ -1,13 +1,20 @@
-import { AlertTriangle, CheckCircle2, OctagonAlert } from "lucide-react";
+import {
+  AlertCircle,
+  AlertTriangle,
+  CheckCircle2,
+  OctagonAlert,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { formatCurrency } from "@/lib/money";
+import { formatExactCurrency, parseExactCents } from "@/lib/money";
 import type { BudgetStatus } from "@/types/domain";
 import { cn } from "@/lib/utils";
 
+const ZERO = BigInt(0);
+
 interface BudgetProgressProps {
   label: string;
-  spentCents: number;
-  limitCents: number;
+  spentCents: number | string | bigint;
+  limitCents: number | string | bigint;
   percentage: number;
   status: BudgetStatus;
   showAmounts?: boolean;
@@ -34,6 +41,12 @@ const STATUS_META: Record<
     barClass: "bg-warning",
     Icon: AlertTriangle,
   },
+  limit_reached: {
+    badgeText: "Límite alcanzado",
+    badgeClass: "border-orange-200 bg-orange-50 text-orange-800",
+    barClass: "bg-orange-600",
+    Icon: AlertCircle,
+  },
   exceeded: {
     badgeText: "Superado",
     badgeClass: "border-red-200 bg-red-50 text-danger-text",
@@ -52,7 +65,10 @@ export function BudgetProgress({
 }: BudgetProgressProps) {
   const { badgeText, badgeClass, barClass, Icon } = STATUS_META[status];
   const clampedWidth = Math.min(Math.max(percentage, 0), 100);
-  const remainingCents = limitCents - spentCents;
+  const spent = parseExactCents(spentCents);
+  const limit = parseExactCents(limitCents);
+  const remaining = limit - spent;
+  const exceeded = spent > limit ? spent - limit : ZERO;
 
   return (
     <div className="space-y-2.5">
@@ -78,7 +94,10 @@ export function BudgetProgress({
         className="h-2.5 w-full overflow-hidden rounded-full bg-secondary"
       >
         <div
-          className={cn("h-full rounded-full transition-all duration-300", barClass)}
+          className={cn(
+            "h-full rounded-full transition-all duration-300",
+            barClass,
+          )}
           style={{ width: `${clampedWidth}%` }}
         />
       </div>
@@ -88,22 +107,26 @@ export function BudgetProgress({
           <span className="text-muted-foreground">
             Gastado:{" "}
             <strong className="font-mono font-medium tabular-nums text-foreground">
-              {formatCurrency(spentCents)}
+              {formatExactCurrency(spent)}
             </strong>{" "}
             de{" "}
             <span className="font-mono tabular-nums">
-              {formatCurrency(limitCents)}
+              {formatExactCurrency(limit)}
             </span>
           </span>
           <span
             className={cn(
               "font-mono font-medium tabular-nums",
-              remainingCents < 0 ? "text-danger-text" : "text-muted-foreground",
+              remaining < ZERO
+                ? "text-danger-text"
+                : remaining === ZERO
+                  ? "text-orange-800"
+                  : "text-muted-foreground",
             )}
           >
-            {remainingCents >= 0
-              ? `Disponible: ${formatCurrency(remainingCents)}`
-              : `Excedido: ${formatCurrency(Math.abs(remainingCents))}`}
+            {remaining >= ZERO
+              ? `Disponible: ${formatExactCurrency(remaining)}`
+              : `Excedido: ${formatExactCurrency(exceeded)}`}
           </span>
         </div>
       )}

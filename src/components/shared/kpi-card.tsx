@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 
 interface KpiCardProps {
   label: string;
-  amountCents: number;
+  amountCents: number | string | bigint;
   tone?: "neutral" | "income" | "expense" | "auto";
   showSign?: boolean;
   helperText?: string;
@@ -35,7 +35,7 @@ export function KpiCard({
                 cents={amountCents}
                 tone={tone}
                 showSign={showSign}
-                className="text-2xl font-semibold sm:text-[1.65rem]"
+                className="break-all text-2xl font-semibold sm:text-[1.65rem]"
               />
             </div>
           </div>

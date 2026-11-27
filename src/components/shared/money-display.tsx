@@ -1,8 +1,16 @@
-import { formatCurrency } from "@/lib/money";
+import {
+  formatCurrency,
+  formatExactCurrency,
+  MAX_SAFE_CENTS,
+  parseExactCents,
+} from "@/lib/money";
 import { cn } from "@/lib/utils";
 
+const ZERO = BigInt(0);
+const MAX_SAFE = BigInt(MAX_SAFE_CENTS);
+
 interface MoneyDisplayProps {
-  cents: number;
+  cents: number | string | bigint;
   tone?: "neutral" | "income" | "expense" | "auto";
   showSign?: boolean;
   compact?: boolean;
@@ -16,19 +24,29 @@ export function MoneyDisplay({
   compact = false,
   className,
 }: MoneyDisplayProps) {
+  const exactValue = parseExactCents(cents);
+
   const resolvedTone =
     tone === "auto"
-      ? cents > 0
+      ? exactValue > ZERO
         ? "income"
-        : cents < 0
+        : exactValue < ZERO
           ? "expense"
           : "neutral"
       : tone;
 
-  const formatted = formatCurrency(cents, {
-    showSign: showSign || resolvedTone === "income",
-    compact,
-  });
+  const shouldShowPlus = showSign || resolvedTone === "income";
+  const absValue = exactValue < ZERO ? -exactValue : exactValue;
+
+  const formatted =
+    compact && absValue <= MAX_SAFE
+      ? formatCurrency(Number(exactValue), {
+          showSign: shouldShowPlus,
+          compact: true,
+        })
+      : formatExactCurrency(exactValue, {
+          showSign: shouldShowPlus,
+        });
 
   return (
     <span
@@ -40,7 +58,9 @@ export function MoneyDisplay({
         className,
       )}
     >
-      {resolvedTone === "expense" && cents > 0 ? `-${formatted}` : formatted}
+      {resolvedTone === "expense" && exactValue > ZERO
+        ? `-${formatted}`
+        : formatted}
     </span>
   );
 }
