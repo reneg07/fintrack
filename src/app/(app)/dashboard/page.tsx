@@ -15,7 +15,7 @@ export const metadata: Metadata = {
 
 export default async function DashboardPage() {
   const defaultResolved = resolvePeriodRange("current_month");
-  const emptyDashboard: DashboardPayload = {
+  const fallbackDashboard: DashboardPayload = {
     period: defaultResolved.periodKey,
     periodLabel: defaultResolved.label,
     periodDescription: defaultResolved.description,
@@ -37,10 +37,26 @@ export default async function DashboardPage() {
     recentTransactions: [],
   };
 
-  const [profile, initialData] = await Promise.all([
+  let initialData: DashboardPayload = fallbackDashboard;
+  let initialError: string | null = null;
+
+  const [profile, dashResult] = await Promise.all([
     getAuthenticatedProfile(),
-    getDashboardData("current_month").catch(() => emptyDashboard),
+    getDashboardData("current_month").then(
+      (data) => ({ ok: true as const, data }),
+      () => ({
+        ok: false as const,
+        message:
+          "No fue posible cargar tu resumen financiero desde el servidor. Intenta nuevamente.",
+      }),
+    ),
   ]);
+
+  if (dashResult.ok) {
+    initialData = dashResult.data;
+  } else {
+    initialError = dashResult.message;
+  }
 
   const firstName = profile?.fullName.split(" ")[0] ?? "";
   const monthOptions = getRecentMonthOptions(6);
@@ -48,6 +64,7 @@ export default async function DashboardPage() {
   return (
     <DashboardClient
       initialData={initialData}
+      initialError={initialError}
       firstName={firstName}
       monthOptions={monthOptions}
     />

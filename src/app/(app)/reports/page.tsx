@@ -41,8 +41,15 @@ export default async function ReportsPage() {
     expenseBreakdown: [],
   };
 
-  const [initialData, categories] = await Promise.all([
-    getReportsData({ period: "last_6_months" }).catch(() => emptyReport),
+  const [reportResult, categories] = await Promise.all([
+    getReportsData({ period: "last_6_months" }).then(
+      (data) => ({ ok: true as const, data }),
+      () => ({
+        ok: false as const,
+        message:
+          "No fue posible generar tus reportes financieros desde el servidor. Intenta nuevamente.",
+      }),
+    ),
     listCategoriesWithUsage().catch(() => []),
   ]);
 
@@ -50,7 +57,8 @@ export default async function ReportsPage() {
 
   return (
     <ReportsClient
-      initialData={initialData}
+      initialData={reportResult.ok ? reportResult.data : emptyReport}
+      initialError={reportResult.ok ? null : reportResult.message}
       categories={categories}
       monthOptions={monthOptions}
     />

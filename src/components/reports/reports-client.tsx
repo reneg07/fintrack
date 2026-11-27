@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   ArrowDownLeft,
   ArrowUpRight,
@@ -27,6 +28,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { EmptyState } from "@/components/shared/empty-state";
+import { ErrorAlert } from "@/components/shared/error-alert";
 import {
   ExactCashflowBarChart,
   ExactExpenseCategoryChart,
@@ -45,6 +47,7 @@ import type {
 
 interface ReportsClientProps {
   initialData: ReportsPayload;
+  initialError?: string | null;
   categories: CategoryWithUsage[];
   monthOptions: Array<{ value: string; label: string }>;
 }
@@ -85,9 +88,11 @@ function renderComparisonBadge(
 
 export function ReportsClient({
   initialData,
+  initialError = null,
   categories,
   monthOptions,
 }: ReportsClientProps) {
+  const router = useRouter();
   const [period, setPeriod] = useState(initialData.period);
   const [useCustomRange, setUseCustomRange] = useState(false);
   const [fromDate, setFromDate] = useState(initialData.range.start);
@@ -99,7 +104,7 @@ export function ReportsClient({
   const [isExporting, setIsExporting] = useState(false);
 
   const [data, setData] = useState<ReportsPayload>(initialData);
-  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [fetchError, setFetchError] = useState<string | null>(initialError);
   const [reloadToken, setReloadToken] = useState(0);
 
   const isFirstRender = useRef(true);
@@ -145,13 +150,18 @@ export function ReportsClient({
 
     fetch(`/api/reports?${queryString}`, { signal: controller.signal })
       .then(async (res) => {
-        const body = (await res.json()) as {
+        if (res.status === 401) {
+          toast.error("Tu sesión ha expirado. Inicia sesión nuevamente.");
+          router.replace("/login?next=/reports");
+          return;
+        }
+        const body = (await res.json().catch(() => null)) as {
           data: ReportsPayload | null;
           error: { message: string } | null;
-        };
-        if (!res.ok || !body.data) {
+        } | null;
+        if (!res.ok || !body?.data) {
           throw new Error(
-            body.error?.message ?? "No fue posible actualizar el reporte.",
+            body?.error?.message ?? "No fue posible actualizar el reporte.",
           );
         }
         setFetchError(null);
@@ -174,7 +184,7 @@ export function ReportsClient({
       });
 
     return () => controller.abort();
-  }, [customRangeError, queryString, requestKey]);
+  }, [customRangeError, queryString, requestKey, router]);
 
   const exportUrl = useMemo(() => {
     const params = new URLSearchParams();
@@ -381,33 +391,24 @@ export function ReportsClient({
         </CardContent>
       </Card>
 
-      {activeError && (
-        <div
-          role="alert"
-          className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-danger-text"
-        >
-          <span>{activeError}</span>
-          {!customRangeError && (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setReloadToken((n) => n + 1)}
-            >
-              Reintentar
-            </Button>
-          )}
-        </div>
-      )}
-
-      {/* Comparison KPI Cards */}
-      {isLoading ? (
-        <div className="grid gap-4 md:grid-cols-3">
-          {Array.from({ length: 3 }).map((_, idx) => (
-            <Skeleton key={idx} className="h-36 w-full rounded-xl" />
-          ))}
-        </div>
+      {activeError && !isLoading ? (
+        <ErrorAlert
+          title="No fue posible obtener los datos del reporte"
+          message={activeError}
+          onRetry={
+            !customRangeError ? () => setReloadToken((n) => n + 1) : undefined
+          }
+        />
       ) : (
+        <>
+          {/* Comparison KPI Cards */}
+          {isLoading ? (
+            <div className="grid gap-4 md:grid-cols-3">
+              {Array.from({ length: 3 }).map((_, idx) => (
+                <Skeleton key={idx} className="h-36 w-full rounded-xl" />
+              ))}
+            </div>
+          ) : (
         <div className="grid gap-4 md:grid-cols-3">
           <Card className="border-border/80 bg-card shadow-none">
             <CardContent className="space-y-3 p-5">
@@ -638,6 +639,8 @@ export function ReportsClient({
               </Table>
             </CardContent>
           </Card>
+        </>
+      )}
         </>
       )}
     </div>

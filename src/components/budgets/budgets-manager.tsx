@@ -31,6 +31,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { BudgetProgress } from "@/components/shared/budget-progress";
 import { CategoryIcon } from "@/components/shared/category-icon";
 import { EmptyState } from "@/components/shared/empty-state";
+import { ErrorAlert } from "@/components/shared/error-alert";
 import { MoneyDisplay } from "@/components/shared/money-display";
 import { PageHeader } from "@/components/shared/page-header";
 import { addMonths, formatMonthLabel } from "@/lib/dates";
@@ -53,17 +54,19 @@ const ZERO = BigInt(0);
 
 interface BudgetsManagerProps {
   initialData: BudgetsMonthPayload;
+  initialError?: string | null;
   expenseCategories: CategoryWithUsage[];
 }
 
 export function BudgetsManager({
   initialData,
+  initialError = null,
   expenseCategories,
 }: BudgetsManagerProps) {
   const router = useRouter();
   const [selectedMonth, setSelectedMonth] = useState(initialData.month);
   const [data, setData] = useState<BudgetsMonthPayload>(initialData);
-  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [fetchError, setFetchError] = useState<string | null>(initialError);
   const [reloadToken, setReloadToken] = useState(0);
 
   const requestKey = `${selectedMonth}|${reloadToken}`;
@@ -111,13 +114,18 @@ export function BudgetsManager({
       signal: controller.signal,
     })
       .then(async (res) => {
-        const body = (await res.json()) as {
+        if (res.status === 401) {
+          toast.error("Tu sesión ha expirado. Inicia sesión nuevamente.");
+          router.replace("/login?next=/budgets");
+          return;
+        }
+        const body = (await res.json().catch(() => null)) as {
           data: BudgetsMonthPayload | null;
           error: { message: string } | null;
-        };
-        if (!res.ok || !body.data) {
+        } | null;
+        if (!res.ok || !body?.data) {
           throw new Error(
-            body.error?.message ?? "No fue posible cargar tus presupuestos.",
+            body?.error?.message ?? "No fue posible cargar tus presupuestos.",
           );
         }
         setFetchError(null);
@@ -140,7 +148,7 @@ export function BudgetsManager({
       });
 
     return () => controller.abort();
-  }, [selectedMonth, requestKey]);
+  }, [selectedMonth, requestKey, router]);
 
   function openCreateDialog() {
     setEditingBudget(null);
@@ -168,6 +176,7 @@ export function BudgetsManager({
   }
 
   async function onSubmit(values: BudgetFormValues) {
+    if (isSubmitting) return;
     setIsSubmitting(true);
     try {
       const limitCents = parsePositiveDollarsToCents(values.limit);
@@ -321,8 +330,16 @@ export function BudgetsManager({
         </div>
       </div>
 
-      {/* Monthly Summary Cards */}
-      <div className="grid gap-3 sm:grid-cols-3">
+      {fetchError && !isLoading ? (
+        <ErrorAlert
+          title="No fue posible obtener tus presupuestos"
+          message={fetchError}
+          onRetry={() => setReloadToken((n) => n + 1)}
+        />
+      ) : (
+        <>
+          {/* Monthly Summary Cards */}
+          <div className="grid gap-3 sm:grid-cols-3">
         <Card className="border-border/80 bg-card shadow-none">
           <CardContent className="space-y-1 p-4">
             <p className="text-xs font-medium text-muted-foreground">
@@ -386,23 +403,6 @@ export function BudgetsManager({
             {data.summary.limitReachedCount} en el límite exacto,{" "}
             {data.summary.exceededCount} superados).
           </p>
-        </div>
-      )}
-
-      {fetchError && (
-        <div
-          role="alert"
-          className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-danger-text"
-        >
-          <span>{fetchError}</span>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => setReloadToken((n) => n + 1)}
-          >
-            Reintentar
-          </Button>
         </div>
       )}
 
@@ -482,9 +482,16 @@ export function BudgetsManager({
           ))}
         </div>
       )}
+        </>
+      )}
 
       {/* Create / Edit Budget Dialog */}
-      <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
+      <Dialog
+        open={isFormOpen}
+        onOpenChange={(open) => {
+          if (!isSubmitting) setIsFormOpen(open);
+        }}
+      >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>
@@ -553,10 +560,20 @@ export function BudgetsManager({
                   inputMode="decimal"
                   placeholder="150.00"
                   disabled={isSubmitting}
+                  aria-invalid={Boolean(form.formState.errors.limit)}
+                  aria-describedby={
+                    form.formState.errors.limit
+                      ? "budget-limit-error"
+                      : undefined
+                  }
                   {...form.register("limit")}
                 />
                 {form.formState.errors.limit && (
-                  <p className="text-xs text-danger-text">
+                  <p
+                    id="budget-limit-error"
+                    role="alert"
+                    className="text-xs text-danger-text"
+                  >
                     {form.formState.errors.limit.message}
                   </p>
                 )}
@@ -574,6 +591,12 @@ export function BudgetsManager({
                 max={99}
                 step={1}
                 disabled={isSubmitting}
+                aria-invalid={Boolean(form.formState.errors.alertThresholdPct)}
+                aria-describedby={
+                  form.formState.errors.alertThresholdPct
+                    ? "budget-threshold-error"
+                    : undefined
+                }
                 {...form.register("alertThresholdPct")}
               />
               <p className="text-xs text-muted-foreground">
@@ -581,7 +604,11 @@ export function BudgetsManager({
                 99%, recomendado 80%).
               </p>
               {form.formState.errors.alertThresholdPct && (
-                <p className="text-xs text-danger-text">
+                <p
+                  id="budget-threshold-error"
+                  role="alert"
+                  className="text-xs text-danger-text"
+                >
                   {form.formState.errors.alertThresholdPct.message}
                 </p>
               )}

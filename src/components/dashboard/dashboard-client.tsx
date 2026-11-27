@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   ArrowDownLeft,
   ArrowRight,
@@ -12,12 +13,14 @@ import {
   Plus,
   TrendingUp,
 } from "lucide-react";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { toast } from "sonner";
+import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CategoryIcon } from "@/components/shared/category-icon";
 import { EmptyState } from "@/components/shared/empty-state";
+import { ErrorAlert } from "@/components/shared/error-alert";
 import {
   ExactCashflowBarChart,
   ExactExpenseCategoryChart,
@@ -31,18 +34,21 @@ import type { DashboardPayload } from "@/types/domain";
 
 interface DashboardClientProps {
   initialData: DashboardPayload;
+  initialError?: string | null;
   firstName: string;
   monthOptions: Array<{ value: string; label: string }>;
 }
 
 export function DashboardClient({
   initialData,
+  initialError = null,
   firstName,
   monthOptions,
 }: DashboardClientProps) {
+  const router = useRouter();
   const [period, setPeriod] = useState(initialData.period);
   const [data, setData] = useState<DashboardPayload>(initialData);
-  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [fetchError, setFetchError] = useState<string | null>(initialError);
   const [reloadToken, setReloadToken] = useState(0);
 
   const requestKey = `${period}|${reloadToken}`;
@@ -63,13 +69,18 @@ export function DashboardClient({
       signal: controller.signal,
     })
       .then(async (res) => {
-        const body = (await res.json()) as {
+        if (res.status === 401) {
+          toast.error("Tu sesión ha expirado. Inicia sesión nuevamente.");
+          router.replace("/login?next=/dashboard");
+          return;
+        }
+        const body = (await res.json().catch(() => null)) as {
           data: DashboardPayload | null;
           error: { message: string } | null;
-        };
-        if (!res.ok || !body.data) {
+        } | null;
+        if (!res.ok || !body?.data) {
           throw new Error(
-            body.error?.message ??
+            body?.error?.message ??
               "No fue posible actualizar el resumen financiero.",
           );
         }
@@ -93,7 +104,7 @@ export function DashboardClient({
       });
 
     return () => controller.abort();
-  }, [period, requestKey]);
+  }, [period, requestKey, router]);
 
   const hasSeriesActivity = data.monthlySeries.some(
     (point) => point.incomeCents !== "0" || point.expenseCents !== "0",
@@ -144,70 +155,61 @@ export function DashboardClient({
         }
       />
 
-      {fetchError && (
-        <div
-          role="alert"
-          className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-danger-text"
-        >
-          <span>{fetchError}</span>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => setReloadToken((n) => n + 1)}
-          >
-            Reintentar
-          </Button>
-        </div>
-      )}
-
-      {/* KPI Cards */}
-      {isLoading ? (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          {Array.from({ length: 4 }).map((_, idx) => (
-            <Skeleton key={idx} className="h-32 w-full rounded-xl" />
-          ))}
-        </div>
+      {fetchError && !isLoading ? (
+        <ErrorAlert
+          title="No fue posible obtener los datos"
+          message={fetchError}
+          onRetry={() => setReloadToken((n) => n + 1)}
+        />
       ) : (
-        <section
-          aria-label="Indicadores financieros principales"
-          className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"
-        >
-          <KpiCard
-            label="Balance acumulado"
-            amountCents={data.kpis.accumulatedBalanceCents}
-            tone="neutral"
-            icon={Landmark}
-            accent="dark"
-            helperText={`Histórico total (${data.kpis.totalTransactionCount} mov., independiente del período)`}
-          />
-          <KpiCard
-            label="Ingresos del período"
-            amountCents={data.kpis.periodIncomeCents}
-            tone="income"
-            icon={ArrowDownLeft}
-            accent="emerald"
-            helperText={data.periodLabel}
-          />
-          <KpiCard
-            label="Gastos del período"
-            amountCents={data.kpis.periodExpenseCents}
-            tone="expense"
-            icon={ArrowUpRight}
-            accent="danger"
-            helperText={data.periodLabel}
-          />
-          <KpiCard
-            label="Flujo neto del período"
-            amountCents={data.kpis.periodNetCents}
-            tone="auto"
-            showSign
-            icon={TrendingUp}
-            accent="default"
-            helperText={`${data.kpis.periodTransactionCount} ${data.kpis.periodTransactionCount === 1 ? "movimiento" : "movimientos"} en el período`}
-          />
-        </section>
-      )}
+        <>
+          {/* KPI Cards */}
+          {isLoading ? (
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              {Array.from({ length: 4 }).map((_, idx) => (
+                <Skeleton key={idx} className="h-32 w-full rounded-xl" />
+              ))}
+            </div>
+          ) : (
+            <section
+              aria-label="Indicadores financieros principales"
+              className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"
+            >
+              <KpiCard
+                label="Balance acumulado"
+                amountCents={data.kpis.accumulatedBalanceCents}
+                tone="neutral"
+                icon={Landmark}
+                accent="dark"
+                helperText={`Histórico total (${data.kpis.totalTransactionCount} mov., independiente del período)`}
+              />
+              <KpiCard
+                label="Ingresos del período"
+                amountCents={data.kpis.periodIncomeCents}
+                tone="income"
+                icon={ArrowDownLeft}
+                accent="emerald"
+                helperText={data.periodLabel}
+              />
+              <KpiCard
+                label="Gastos del período"
+                amountCents={data.kpis.periodExpenseCents}
+                tone="expense"
+                icon={ArrowUpRight}
+                accent="danger"
+                helperText={data.periodLabel}
+              />
+              <KpiCard
+                label="Flujo neto del período"
+                amountCents={data.kpis.periodNetCents}
+                tone="auto"
+                showSign
+                icon={TrendingUp}
+                accent="default"
+                helperText={`${data.kpis.periodTransactionCount} ${data.kpis.periodTransactionCount === 1 ? "movimiento" : "movimientos"} en el período`}
+              />
+            </section>
+          )}
 
       {/* Empty account onboarding state */}
       {!isLoading && data.kpis.totalTransactionCount === 0 ? (
@@ -397,6 +399,8 @@ export function DashboardClient({
               </CardContent>
             </Card>
           </div>
+        </>
+      )}
         </>
       )}
     </div>

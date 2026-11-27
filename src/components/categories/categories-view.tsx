@@ -29,6 +29,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { CategoryIcon } from "@/components/shared/category-icon";
 import { EmptyState } from "@/components/shared/empty-state";
+import { ErrorAlert } from "@/components/shared/error-alert";
 import { PageHeader } from "@/components/shared/page-header";
 import {
   CATEGORY_COLOR_SWATCHES,
@@ -47,6 +48,7 @@ import type {
 
 interface CategoriesViewProps {
   initialCategories: CategoryWithUsage[];
+  initialError?: string | null;
 }
 
 const ICON_ENTRIES = Object.entries(CATEGORY_ICON_MAP) as [
@@ -54,7 +56,10 @@ const ICON_ENTRIES = Object.entries(CATEGORY_ICON_MAP) as [
   (typeof CATEGORY_ICON_MAP)[CategoryIconKey],
 ][];
 
-export function CategoriesView({ initialCategories }: CategoriesViewProps) {
+export function CategoriesView({
+  initialCategories,
+  initialError = null,
+}: CategoriesViewProps) {
   const router = useRouter();
   const [categories, setCategories] =
     useState<CategoryWithUsage[]>(initialCategories);
@@ -117,6 +122,7 @@ export function CategoriesView({ initialCategories }: CategoriesViewProps) {
   }
 
   async function onSubmit(values: CreateCategoryValues) {
+    if (isSubmitting) return;
     setIsSubmitting(true);
     try {
       const isEditing = editingCategory !== null;
@@ -135,6 +141,12 @@ export function CategoriesView({ initialCategories }: CategoriesViewProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
+
+      if (response.status === 401) {
+        toast.error("Tu sesión ha expirado. Inicia sesión nuevamente.");
+        router.replace("/login?next=/categories");
+        return;
+      }
 
       const body = (await response.json()) as {
         data: CategoryWithUsage | null;
@@ -328,7 +340,13 @@ export function CategoriesView({ initialCategories }: CategoriesViewProps) {
         </div>
       </div>
 
-      {categories.length === 0 ? (
+      {initialError ? (
+        <ErrorAlert
+          title="No fue posible obtener tus categorías"
+          message={initialError}
+          onRetry={() => router.refresh()}
+        />
+      ) : categories.length === 0 ? (
         <EmptyState
           icon={Tags}
           title="Aún no hay categorías registradas"
@@ -406,7 +424,12 @@ export function CategoriesView({ initialCategories }: CategoriesViewProps) {
       )}
 
       {/* Create / Edit Category Dialog */}
-      <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
+      <Dialog
+        open={isFormOpen}
+        onOpenChange={(open) => {
+          if (!isSubmitting) setIsFormOpen(open);
+        }}
+      >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>
@@ -431,10 +454,20 @@ export function CategoriesView({ initialCategories }: CategoriesViewProps) {
                 placeholder="Ej. Mascotas, Bonos, Gimnasio"
                 maxLength={60}
                 disabled={isSubmitting}
+                aria-invalid={Boolean(form.formState.errors.name)}
+                aria-describedby={
+                  form.formState.errors.name
+                    ? "category-name-error"
+                    : undefined
+                }
                 {...form.register("name")}
               />
               {form.formState.errors.name && (
-                <p className="text-xs text-danger-text">
+                <p
+                  id="category-name-error"
+                  role="alert"
+                  className="text-xs text-danger-text"
+                >
                   {form.formState.errors.name.message}
                 </p>
               )}

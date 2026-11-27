@@ -8,6 +8,19 @@ export const metadata: Metadata = {
 };
 
 export default async function CategoriesPage() {
-  const categories = await listCategoriesWithUsage().catch(() => []);
-  return <CategoriesView initialCategories={categories} />;
+  const result = await listCategoriesWithUsage().then(
+    (data) => ({ ok: true as const, data }),
+    () => ({
+      ok: false as const,
+      message:
+        "No fue posible cargar tus categorías desde el servidor. Intenta nuevamente.",
+    }),
+  );
+
+  return (
+    <CategoriesView
+      initialCategories={result.ok ? result.data : []}
+      initialError={result.ok ? null : result.message}
+    />
+  );
 }

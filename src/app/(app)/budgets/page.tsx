@@ -28,14 +28,22 @@ export default async function BudgetsPage() {
     },
   };
 
-  const [initialData, expenseCategories] = await Promise.all([
-    listBudgetsForMonth(currentMonth).catch(() => emptyPayload),
+  const [budgetsResult, expenseCategories] = await Promise.all([
+    listBudgetsForMonth(currentMonth).then(
+      (data) => ({ ok: true as const, data }),
+      () => ({
+        ok: false as const,
+        message:
+          "No fue posible cargar tus presupuestos mensuales desde el servidor. Intenta nuevamente.",
+      }),
+    ),
     listCategoriesWithUsage({ type: "expense" }).catch(() => []),
   ]);
 
   return (
     <BudgetsManager
-      initialData={initialData}
+      initialData={budgetsResult.ok ? budgetsResult.data : emptyPayload}
+      initialError={budgetsResult.ok ? null : budgetsResult.message}
       expenseCategories={expenseCategories}
     />
   );

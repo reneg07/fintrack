@@ -33,14 +33,22 @@ export default async function TransactionsPage({
   searchParams,
 }: TransactionsPageProps) {
   const params = await searchParams;
-  const [initialData, categories] = await Promise.all([
-    listTransactions({ page: 1, pageSize: 10 }).catch(() => EMPTY_TRANSACTIONS),
+  const [txResult, categories] = await Promise.all([
+    listTransactions({ page: 1, pageSize: 10 }).then(
+      (data) => ({ ok: true as const, data }),
+      () => ({
+        ok: false as const,
+        message:
+          "No fue posible cargar tus transacciones desde el servidor. Intenta nuevamente.",
+      }),
+    ),
     listCategoriesWithUsage().catch(() => []),
   ]);
 
   return (
     <TransactionsManager
-      initialData={initialData}
+      initialData={txResult.ok ? txResult.data : EMPTY_TRANSACTIONS}
+      initialError={txResult.ok ? null : txResult.message}
       categories={categories}
       defaultOpenCreate={params.new === "1"}
     />

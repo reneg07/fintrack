@@ -40,6 +40,7 @@ import {
 } from "@/components/ui/table";
 import { CategoryIcon } from "@/components/shared/category-icon";
 import { EmptyState } from "@/components/shared/empty-state";
+import { ErrorAlert } from "@/components/shared/error-alert";
 import { MoneyDisplay } from "@/components/shared/money-display";
 import { PageHeader } from "@/components/shared/page-header";
 import { useDebounce } from "@/hooks/use-debounce";
@@ -61,6 +62,7 @@ import type {
 
 interface TransactionsManagerProps {
   initialData: PaginatedTransactionsResult;
+  initialError?: string | null;
   categories: CategoryWithUsage[];
   defaultOpenCreate?: boolean;
 }
@@ -69,6 +71,7 @@ const PAGE_SIZE = 10;
 
 export function TransactionsManager({
   initialData,
+  initialError = null,
   categories,
   defaultOpenCreate = false,
 }: TransactionsManagerProps) {
@@ -84,7 +87,7 @@ export function TransactionsManager({
   const [toDate, setToDate] = useState("");
   const [page, setPage] = useState(1);
 
-  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [fetchError, setFetchError] = useState<string | null>(initialError);
   const [reloadToken, setReloadToken] = useState(0);
 
   // Create / Edit dialog state
@@ -192,13 +195,18 @@ export function TransactionsManager({
       signal: controller.signal,
     })
       .then(async (res) => {
-        const body = (await res.json()) as {
+        if (res.status === 401) {
+          toast.error("Tu sesión ha expirado. Inicia sesión nuevamente.");
+          router.replace("/login?next=/transactions");
+          return;
+        }
+        const body = (await res.json().catch(() => null)) as {
           data: PaginatedTransactionsResult | null;
           error: { message: string } | null;
-        };
-        if (!res.ok || !body.data) {
+        } | null;
+        if (!res.ok || !body?.data) {
           throw new Error(
-            body.error?.message ?? "No fue posible cargar tus transacciones.",
+            body?.error?.message ?? "No fue posible cargar tus transacciones.",
           );
         }
         setFetchError(null);
@@ -221,7 +229,7 @@ export function TransactionsManager({
       });
 
     return () => controller.abort();
-  }, [dateRangeError, queryString, requestKey]);
+  }, [dateRangeError, queryString, requestKey, router]);
 
   const hasActiveFilters =
     searchInput.trim().length > 0 ||
@@ -267,6 +275,7 @@ export function TransactionsManager({
   }
 
   async function onSubmit(values: TransactionFormValues) {
+    if (isSubmitting) return;
     setIsSubmitting(true);
     try {
       const amountCents = parsePositiveDollarsToCents(values.amount);
@@ -532,27 +541,15 @@ export function TransactionsManager({
         </CardContent>
       </Card>
 
-      {activeError && (
-        <div
-          role="alert"
-          className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-danger-text"
-        >
-          <span>{activeError}</span>
-          {!dateRangeError && (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setReloadToken((n) => n + 1)}
-            >
-              Reintentar
-            </Button>
-          )}
-        </div>
-      )}
-
-      {/* Results List */}
-      {isLoading ? (
+      {activeError && !isLoading ? (
+        <ErrorAlert
+          title="No fue posible obtener tus transacciones"
+          message={activeError}
+          onRetry={
+            !dateRangeError ? () => setReloadToken((n) => n + 1) : undefined
+          }
+        />
+      ) : isLoading ? (
         <Card className="border-border/80 bg-card shadow-none">
           <CardContent className="space-y-3 p-4">
             {Array.from({ length: 5 }).map((_, idx) => (
@@ -798,7 +795,12 @@ export function TransactionsManager({
       )}
 
       {/* Create / Edit Transaction Dialog */}
-      <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
+      <Dialog
+        open={isFormOpen}
+        onOpenChange={(open) => {
+          if (!isSubmitting) setIsFormOpen(open);
+        }}
+      >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>
@@ -837,10 +839,18 @@ export function TransactionsManager({
                   inputMode="decimal"
                   placeholder="0.00"
                   disabled={isSubmitting}
+                  aria-invalid={Boolean(form.formState.errors.amount)}
+                  aria-describedby={
+                    form.formState.errors.amount ? "tx-amount-error" : undefined
+                  }
                   {...form.register("amount")}
                 />
                 {form.formState.errors.amount && (
-                  <p className="text-xs text-danger-text">
+                  <p
+                    id="tx-amount-error"
+                    role="alert"
+                    className="text-xs text-danger-text"
+                  >
                     {form.formState.errors.amount.message}
                   </p>
                 )}
@@ -853,6 +863,12 @@ export function TransactionsManager({
                 <select
                   id="tx-category"
                   disabled={isSubmitting}
+                  aria-invalid={Boolean(form.formState.errors.categoryId)}
+                  aria-describedby={
+                    form.formState.errors.categoryId
+                      ? "tx-category-error"
+                      : undefined
+                  }
                   className="flex h-9 w-full rounded-lg border border-input bg-card px-3 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
                   {...form.register("categoryId")}
                 >
@@ -867,7 +883,11 @@ export function TransactionsManager({
                   )}
                 </select>
                 {form.formState.errors.categoryId && (
-                  <p className="text-xs text-danger-text">
+                  <p
+                    id="tx-category-error"
+                    role="alert"
+                    className="text-xs text-danger-text"
+                  >
                     {form.formState.errors.categoryId.message}
                   </p>
                 )}
@@ -879,10 +899,20 @@ export function TransactionsManager({
                   id="tx-date"
                   type="date"
                   disabled={isSubmitting}
+                  aria-invalid={Boolean(form.formState.errors.occurredOn)}
+                  aria-describedby={
+                    form.formState.errors.occurredOn
+                      ? "tx-date-error"
+                      : undefined
+                  }
                   {...form.register("occurredOn")}
                 />
                 {form.formState.errors.occurredOn && (
-                  <p className="text-xs text-danger-text">
+                  <p
+                    id="tx-date-error"
+                    role="alert"
+                    className="text-xs text-danger-text"
+                  >
                     {form.formState.errors.occurredOn.message}
                   </p>
                 )}
@@ -896,10 +926,20 @@ export function TransactionsManager({
                 placeholder="Ej. Supermercado semanal, Pago de salario"
                 maxLength={200}
                 disabled={isSubmitting}
+                aria-invalid={Boolean(form.formState.errors.description)}
+                aria-describedby={
+                  form.formState.errors.description
+                    ? "tx-description-error"
+                    : undefined
+                }
                 {...form.register("description")}
               />
               {form.formState.errors.description && (
-                <p className="text-xs text-danger-text">
+                <p
+                  id="tx-description-error"
+                  role="alert"
+                  className="text-xs text-danger-text"
+                >
                   {form.formState.errors.description.message}
                 </p>
               )}
@@ -912,10 +952,18 @@ export function TransactionsManager({
                 placeholder="Detalles adicionales o referencia"
                 maxLength={500}
                 disabled={isSubmitting}
+                aria-invalid={Boolean(form.formState.errors.notes)}
+                aria-describedby={
+                  form.formState.errors.notes ? "tx-notes-error" : undefined
+                }
                 {...form.register("notes")}
               />
               {form.formState.errors.notes && (
-                <p className="text-xs text-danger-text">
+                <p
+                  id="tx-notes-error"
+                  role="alert"
+                  className="text-xs text-danger-text"
+                >
                   {form.formState.errors.notes.message}
                 </p>
               )}
