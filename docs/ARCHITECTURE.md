@@ -1,30 +1,35 @@
 # Arquitectura de Software — FinTrack
 
-> **Estado actual:** Fase 03 implementada y verificada localmente (migraciones PostgreSQL, RLS, tipos `database.ts`, clientes Supabase SSR, `src/proxy.ts`, autenticación real `/login`, `/register`, `/auth/callback`, protección de rutas, APIs `/api/profile` y `/api/auth/signout`, estados vacíos honestos en rutas privadas). Aplicación remota de migraciones y verificación en vivo de RLS pendientes de proyecto Supabase autorizado en `.env.local`.
+> **Estado actual:** **Fase 04 completada y verificada** contra Supabase PostgreSQL real. Todos los módulos privados (`/dashboard`, `/transactions`, `/categories`, `/budgets`, `/reports`, `/settings`) operan mediante Server Components + Client Components + 11 Route Handlers internos con autenticación autoritativa `getUser()`, RLS por usuario, motor monetario exacto `BigInt` (ADR-011) y exportación CSV sanitizada.
 
-## 1. Arquitectura de Autenticación y Renderizado (Fase 03)
+## 1. Arquitectura General, Autenticación y Flujo de Datos (Fase 04)
 
 ```mermaid
 flowchart TD
-    Browser["Navegador / Client Components"]
+    Browser["Navegador / Client Components (React 19)"]
     Proxy["src/proxy.ts (Next.js 16 Network Boundary)"]
     Public["(marketing) / — Static"]
     AuthUI["(auth) /login, /register + /auth/callback"]
     AppLayout["(app)/layout.tsx (force-dynamic + getUser())"]
-    API["Route Handlers (/api/profile, /api/auth/signout)"]
-    Services["Server Services (server-only)"]
-    SupaSSR["Supabase SSR Client (Cookies HTTP)"]
+    Pages["RSC Pages: dashboard, transactions, categories, budgets, reports, settings"]
+    API["11 Route Handlers (/api/categories, /api/transactions, /api/budgets, /api/dashboard, /api/reports, /api/reports/export, /api/profile, /api/auth/signout)"]
+    Services["Server Services (server-only + requireAuthenticatedContext)"]
+    Agg["Motor Exacto BigInt + Paginación Completa (ADR-011 / ADR-013)"]
+    SupaSSR["Supabase SSR Client (Cookies HTTP, Publishable Key)"]
     PG["Supabase PostgreSQL + Auth + RLS"]
 
     Browser --> Proxy
     Proxy -->|"Público"| Public
-    Proxy -->|"Redirige a /dashboard si ya autenticado"| AuthUI
-    Proxy -->|"Verifica JWT vía getClaims(); redirige a /login si sin sesión"| AppLayout
-    Proxy -->|"Nunca redirige HTML; propaga cookies y Cache-Control: no-store"| API
-    AppLayout -->|"Verificación autoritativa getUser()"| Services
-    API -->|"Validación Same-Origin + Zod + getUser()"| Services
-    Services --> SupaSSR
-    SupaSSR -->|"Publishable Key + JWT usuario (sin service_role)"| PG
+    Proxy -->|"Redirige a /dashboard si autenticado"| AuthUI
+    Proxy -->|"getClaims(); redirige a /login si sin sesión"| AppLayout
+    Proxy -->|"Nunca redirige HTML; Cache-Control: no-store"| API
+    AppLayout -->|"getUser()"| Pages
+    Pages -->|"Carga inicial SSR"| Services
+    Browser -->|"Mutaciones, filtros abortables y descarga CSV"| API
+    API -->|"Same-Origin -> getUser() (401) -> Zod (400)"| Services
+    Services --> Agg
+    Agg --> SupaSSR
+    SupaSSR -->|"JWT usuario (nunca service_role)"| PG
 ```
 
 ## 2. Modelo Entidad-Relación en PostgreSQL (Migraciones Versionadas)
@@ -82,7 +87,29 @@ erDiagram
     }
 ```
 
-## 3. Índices Justificados (`20261126230000_initial_schema.sql`)
+## 3. Contratos de Route Handlers Internos
+
+Todos los Route Handlers privados aplican el mismo orden defensivo:
+1. Validación `isValidSameOrigin(request)` en mutaciones (`POST`, `PATCH`, `DELETE`) → HTTP `403`.
+2. Verificación autoritativa `requireAuthenticatedContext()` vía `supabase.auth.getUser()` → HTTP `401` (siempre **antes** de validar cuerpo o parámetros para no filtrar esquemas a usuarios anónimos).
+3. Validación de UUIDs, query params y payload con Zod → HTTP `400`.
+4. Ejecución de servicio `server-only` sujeto a RLS y mapeo controlado de errores (`404`, `409`, `500`) con cabecera `Cache-Control: no-store, private, max-age=0` y `Vary: Cookie`.
+
+| Endpoint | Métodos | Responsabilidad principal |
+| :--- | :--- | :--- |
+| `/api/categories` | `GET`, `POST` | Listado con conteo exacto de uso y creación con unicidad (`409`) |
+| `/api/categories/[id]` | `PATCH`, `DELETE` | Edición (bloqueo `409` al cambiar tipo en uso) y borrado seguro (`409` si vinculada) |
+| `/api/transactions` | `GET`, `POST` | Listado paginado + totales exactos `BigInt` sobre todo el filtro y creación validada |
+| `/api/transactions/[id]` | `GET`, `PATCH`, `DELETE` | Consulta, edición con validación de compatibilidad tipo-categoría y eliminación |
+| `/api/budgets` | `GET`, `POST` | Presupuestos mensuales con consumo real en 4 estados y creación exclusiva para gastos |
+| `/api/budgets/[id]` | `PATCH`, `DELETE` | Edición de límite/umbral y eliminación sin afectar transacciones |
+| `/api/dashboard` | `GET` | Balance histórico acumulado + KPIs, series mensuales, dona de gastos y 5 recientes |
+| `/api/reports` | `GET` | Resúmenes por período/rango personalizado y comparativas (`changePct: null` si base `0`) |
+| `/api/reports/export` | `GET` | Exportación `text/csv; charset=utf-8` con BOM UTF-8, RFC 4180 y anti Formula Injection |
+| `/api/profile` | `GET`, `PATCH` | Lectura y actualización del nombre del perfil |
+| `/api/auth/signout` | `POST` | Cierre de sesión seguro en servidor |
+
+## 4. Índices Justificados (`20261126230000_initial_schema.sql`)
 
 | Índice | Tabla y Columnas | Consulta que optimiza |
 | :--- | :--- | :--- |
@@ -93,34 +120,22 @@ erDiagram
 | `idx_transactions_category_id` | `transactions (category_id)` | Filtro por categoría y validación rápida de `ON DELETE RESTRICT` |
 | `idx_budgets_user_month` | `budgets (user_id, month)` | Consulta mensual de presupuestos en `/budgets` |
 
-## 4. Estrategia de Confirmación por Correo y Redirecciones (`/auth/callback`)
-
-- **Confirmación habilitada (recomendada para producción):** `supabase.auth.signUp` crea el usuario sin sesión activa; `RegisterForm` muestra una pantalla clara de verificación de correo. El enlace enviado apunta a `/auth/callback?next=/dashboard`, donde se intercambia el `code` (PKCE) o `token_hash`+`type` (OTP) por cookies HTTP seguras.
-- **Confirmación deshabilitada (opcional en pruebas académicas controladas):** Si el supervisor la desactiva temporalmente en Supabase Auth, `signUp` devuelve sesión activa inmediata y redirige a `/dashboard`. No se desactiva silenciosamente en producción.
-- **Prevención de Open Redirects:** `sanitizeNextPath` (`src/lib/redirects.ts`) rechaza URLs absolutas, `//`, `\`, esquemas `http:`/`javascript:` y rutas fuera de los 6 prefijos privados de FinTrack.
-- **Configuración en Supabase Dashboard (Auth → URL Configuration):**
-  - **Site URL (local):** `http://localhost:3000`
-  - **Redirect URLs (local):** `http://localhost:3000/auth/callback`
-  - **Configuración futura en Vercel (Fase 06):** Actualizar **Site URL** a `https://<tu-app>.vercel.app` y agregar `https://<tu-app>.vercel.app/auth/callback` en Redirect URLs.
-
 ## 5. Registro de Decisiones de Arquitectura (ADR)
 
-- **ADR-001:** Aritmética monetaria exclusivamente en centavos enteros (`BIGINT`, techo `900,000,000,000,000` compatible con `Number.MAX_SAFE_INTEGER`).
-- **ADR-002:** Zona horaria determinista `America/El_Salvador` y fechas calendario `DATE`.
-- **ADR-003 / ADR-009:** Eliminación de `cacheComponents` y `partialPrefetching` en `next.config.ts` + `export const dynamic = "force-dynamic"` en `(app)/layout.tsx` y `Cache-Control: no-store, private` en Route Handlers, garantizando que nunca se cacheen vistas o respuestas privadas entre usuarios mientras `/` permanece estático.
-- **ADR-004:** Actualización limpia de `@types/node@^22` alineada con `Node.js v22.19.0` para compatibilidad sin `--force` con `vitest@5.1.2`.
+- **ADR-001:** Aritmética monetaria exclusivamente en centavos enteros (`BIGINT`, techo individual `900,000,000,000,000` seguro bajo `Number.MAX_SAFE_INTEGER`).
+- **ADR-002:** Zona horaria determinista `America/El_Salvador` (UTC-6 sin DST) y fechas calendario `DATE` (`YYYY-MM-DD`).
+- **ADR-003 / ADR-009:** Sin `cacheComponents`/`partialPrefetching`, `export const dynamic = "force-dynamic"` en `(app)/layout.tsx` y `Cache-Control: no-store, private` en todos los Route Handlers privados, manteniendo `/` estático.
+- **ADR-004:** `@types/node@^22` alineado con `Node.js v22.19.0` para compatibilidad limpia con `vitest@5.1.2`.
 - **ADR-005:** `shadcn/ui` (`base-nova` sobre `@base-ui/react@1.9.0`) nativo para React 19 y Tailwind CSS v4.
-- **ADR-006:** Transición de `demo-data.ts`: restringido exclusivamente a la vista previa claramente etiquetada en `/` y pruebas unitarias; las rutas autenticadas muestran estados vacíos reales y categorías reales de PostgreSQL.
-- **ADR-007:** Tipografía `Geist` autoalojada (`geist@1.9.2`) para compilación determinista sin red externa.
+- **ADR-006:** `demo-data.ts` restringido únicamente a la vista previa demostrativa en `/` y pruebas unitarias; ninguna ruta privada utiliza datos mock.
+- **ADR-007:** Tipografía `Geist` autoalojada (`geist@1.9.2`) para compilación reproducible sin dependencias externas de fuentes.
 - **ADR-008:** Contraste WCAG AA ajustado (`--primary: #047857`, `--danger-text: #B91C1C`, `--warning-text: #B45309`).
-- **ADR-010:** Defensa en profundidad en autenticación: `src/proxy.ts` (`getClaims()`) + `(app)/layout.tsx` (`getUser()`) + Route Handlers (`getUser()` + validación `Origin` Same-Origin) + RLS forzado y privilegios mínimos (`REVOKE ALL FROM PUBLIC, anon`) en PostgreSQL.
-- **ADR-011 — Estrategia de Seguridad Monetaria Acumulada (Preparación Fase 04):**
-  - **Riesgo identificado:** El límite individual por transacción en PostgreSQL y `src/lib/money.ts` es `900,000,000,000,000` centavos (`$9T`, seguro dentro de `Number.MAX_SAFE_INTEGER = 9,007,199,254,740,991`). Sin embargo, la suma de más de 10 registros en ese extremo podría exceder `Number.MAX_SAFE_INTEGER` en JavaScript si se transporta directamente como `number` IEEE-754.
-  - **Estrategia obligatoria para Fase 04:**
-    1. **Agregaciones exactas en PostgreSQL:** Ejecutar sumas de totales (`SUM(amount_cents)`) en PostgreSQL (donde `SUM(bigint)` devuelve `numeric` de precisión arbitraria sin desbordamiento de 64 bits) o bien acumular en servidor usando `BigInt` sobre cada registro retornado.
-    2. **Serialización y transporte seguros:** Al leer totales agregados desde PostgreSQL/PostgREST, validar que cada valor individual o acumulado sea entero exacto y parsear mediante `BigInt` antes de validar contra `MAX_SAFE_CENTS` (o devolver cadena decimal/entera exacta en contratos donde el acumulado supere el límite seguro).
-    3. **Formateo sin pérdida de precisión:** Extender `src/lib/money.ts` en Fase 04 con soporte opcional de `bigint` para formateo directo (`bigintCentsToDisplay`) sin pasar por división flotante imprecisa (`cents / 100`) cuando el acumulado sea elevado.
-    4. **Validación de límites acumulados:** Mantener el techo individual razonable en esquemas Zod y validar siempre con `Number.isSafeInteger` en bordes de conversión.
-- **ADR-012 — Gestión del Historial de Migraciones Aplicadas vía SQL Editor:**
-  - **Estado real:** Las migraciones iniciales (`20261126230000_initial_schema.sql` y `20261126230100_rls_and_seed.sql`) se aplicaron manualmente mediante `supabase/phase-03-setup.sql` en el SQL Editor de Supabase (no están registradas en `supabase_migrations.schema_migrations` de Supabase CLI).
-  - **Regla de continuidad:** Nunca modificar retroactivamente migraciones ya aplicadas; todo ajuste futuro se agregará como una nueva migración idempotente con timestamp posterior (p. ej. `20261126235000_fix_utf8_seed_and_comments.sql`). Si en el futuro se adopta `supabase db push`, se deberá ejecutar `supabase migration repair --status applied` para los timestamps ya aplicados antes de empujar nuevas migraciones.
+- **ADR-010:** Defensa en profundidad en autenticación: `src/proxy.ts` (`getClaims()`) + `(app)/layout.tsx` (`getUser()`) + Route Handlers (`Same-Origin` → `getUser()` → `Zod`) + RLS forzado en PostgreSQL.
+- **ADR-011 — Motor Monetario Acumulado en Precisión Arbitraria (`BigInt` + `ExactCents`) [Implementado y Verificado en Fase 04]:**
+  - Todas las agregaciones de servidor (`transactions.service.ts`, `budgets.service.ts`, `dashboard.service.ts`, `reports.service.ts`, `financial-aggregations.ts`) suman centavos con `BigInt` y serializan totales como cadenas decimales exactas `ExactCents` (`string`).
+  - `formatExactCurrency` y `exactCentsToDecimalString` (`src/lib/money.ts`) formatean mediante división entera `BigInt` sin pasar por `number` IEEE-754, verificado con pruebas unitarias por encima de `Number.MAX_SAFE_INTEGER` (`$108,000,000,000,000.01`).
+  - La conversión a `number` queda confinada exclusivamente a `exactCentsToChartNumber` para coordenadas de trazado en Recharts, mientras tooltips, KPIs, tablas y CSV leen los valores exactos `ExactCents`.
+- **ADR-012 — Gestión del Historial de Migraciones Aplicadas vía SQL Editor:** Nunca alterar migraciones ya aplicadas; toda evolución SQL futura entra como nueva migración idempotente con timestamp posterior. En Fase 04 no se requirió ninguna migración SQL nueva.
+- **ADR-013 — Agregaciones Completas sin Truncamiento PostgREST y Estado Derivado React 19 [Implementado y Verificado en Fase 04]:**
+  - `fetchAllUserTransactions` y `computeFilteredExactTotals` recorren lotes ordenados determinísticamente de `1000` filas (`.range(offset, offset + 999)` con desempate `occurred_on DESC, created_at DESC, id DESC`) para garantizar que dashboard, presupuestos, reportes, totales filtrados y exportación CSV nunca se trunquen en el límite por defecto de PostgREST ni en la página visible.
+  - Los Client Components interactivos derivan `isLoading` comparando `settledKey !== requestKey`, cumpliendo estrictamente `react-hooks/set-state-in-effect` de React 19 sin renders en cascada y cancelando peticiones obsoletas con `AbortController`.

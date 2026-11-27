@@ -1,61 +1,45 @@
 # Estrategia y Registro de Pruebas — FinTrack
 
-Este documento registra la estrategia de aseguramiento de calidad y los resultados **reales y verificables** de cada ejecución de pruebas, diferenciando entre análisis estático, pruebas unitarias, pruebas locales de navegador, pruebas reales de integración contra Supabase y pruebas de seguridad.
+Este documento registra la estrategia de aseguramiento de calidad y los resultados **reales y verificables** de cada ejecución de pruebas, diferenciando entre análisis estático, pruebas unitarias, pruebas de seguridad API, pruebas reales de integración PostgreSQL/RLS y pruebas E2E/responsive en navegador aislado.
 
 ## 1. Pirámide de Validación
-1. **Validaciones estáticas:** `npx next typegen`, `npm run lint` (ESLint) y `npm run typecheck` (`tsc --noEmit`).
-2. **Pruebas unitarias (`npm run test` — Vitest):**
-   - `tests/money.test.ts` (7 tests): aritmética en centavos enteros, formateo USD, `MAX_SAFE_CENTS` y presupuestos.
-   - `tests/dates.test.ts` (4 tests): `America/El_Salvador`, medianoche UTC y años bisiestos.
-   - `tests/auth-schema.test.ts` (4 tests): esquemas Zod de login y registro.
-   - `tests/demo-data.test.ts` (3 tests): consistencia matemática de datos de presentación.
-   - `tests/security-helpers.test.ts` (4 tests): prevención de open redirects, mapeo seguro de errores Auth, validación de perfil y Same-Origin.
-3. **Compilación de producción y seguridad de paquetes:** `npm run build` y `npm audit --audit-level=moderate`.
-4. **Pruebas de navegador y matriz responsive (Playwright aislado):** `npm run verify:phase02` y `npm run verify:phase03`.
-5. **Pruebas reales de integración PostgreSQL + RLS de 2 usuarios (`npm run test:supabase-rls`):** Ejecutadas contra el proyecto autorizado de Supabase usando exclusivamente `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (sin `service_role`).
+1. **Validaciones estáticas:** `npx next typegen`, `npm run lint` (ESLint + React 19 hooks), `npm run typecheck` (`tsc --noEmit`).
+2. **Pruebas unitarias (`npm run test` — Vitest, 7 archivos / 32 tests):**
+   - `tests/money.test.ts` (8 tests): centavos enteros, precisión arbitraria `BigInt` > `Number.MAX_SAFE_INTEGER`, 4 estados de presupuesto (`healthy`, `warning`, `limit_reached`, `exceeded`) y comparativas con base `0` (`null`).
+   - `tests/dates.test.ts` (5 tests): `America/El_Salvador`, medianoche UTC, años bisiestos, transiciones de año y `resolvePeriodRange`.
+   - `tests/csv.test.ts` (4 tests): BOM UTF-8, RFC 4180, neutralización de Formula Injection (`=`, `+`, `-`, `@`, `\t`, espacios iniciales) y preservación de montos negativos USD.
+   - `tests/financial-schemas.test.ts` (4 tests): esquemas Zod de categorías, transacciones, presupuestos, reportes/CSV y motor `financial-aggregations.ts` por encima de `MAX_SAFE_INTEGER`.
+   - `tests/auth-schema.test.ts` (4 tests), `tests/demo-data.test.ts` (3 tests), `tests/security-helpers.test.ts` (4 tests).
+3. **Compilación de producción y auditoría de dependencias:** `npm run build` y `npm audit --audit-level=moderate`.
+4. **Pruebas reales PostgreSQL + RLS (`npm run test:supabase-rls`, 18 checks):** 2 usuarios reales independientes usando exclusivamente `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (sin `service_role`).
+5. **Pruebas reales de seguridad API y escenario financiero determinista (`npm run test:api-security`, 42 checks):** cookies SSR reales para Usuario A y Usuario B contra todos los Route Handlers de Fase 04.
+6. **Pruebas E2E en navegador real + descarga CSV + matriz responsive (`npm run verify:phase04` y regresión `npm run verify:phase03`).**
 
 ---
 
 ## 2. Registro Real de Ejecuciones
 
 ### Fase 01 — Planificación (2026-11-26)
-- Inspección no destructiva del entorno (`Node.js v22.19.0`, `npm 10.9.3`, `Git 2.43.0.windows.1`, workspace vacío). **Verificado.**
+- Inspección del entorno (`Node.js v22.19.0`, `npm 10.9.3`, `Git 2.43.0.windows.1`). **Verificado.**
 
 ### Fase 02 — Inicialización y Diseño UI/UX (2026-11-26)
-- `lint`, `typecheck`, `test` (18/18), `build` y `verify:phase02` (**9/9 rutas HTTP 200**, `h1Count: 1`, **42/42 checks de overflow en 6 rutas × 7 resoluciones**, 5/5 interactivos, 11 capturas PNG, 0 errores de consola). **Verificado.**
+- `lint`, `typecheck`, `test` (18/18), `build` y `verify:phase02` (9/9 rutas HTTP 200, 42/42 responsive parcial, 11 capturas PNG, 0 errores). **Verificado.**
 
-### Fase 03 — Implementación Base (2026-11-26)
-- Implementación de migraciones, RLS, Supabase SSR, `src/proxy.ts`, `/auth/callback`, `/api/profile`, `/api/auth/signout` y validaciones locales (`lint`, `typecheck`, 22/22 tests, `build`, `verify:phase03` sin `.env.local`).
+### Fase 03 / 03.1 — Base de Datos, RLS y Autenticación (2026-11-26 / 2026-11-27)
+- `lint`, `typecheck`, `test` (22/22), `build`, `test:supabase-rls` (**18/18**), `verify:phase03` (**15/15** flujos autenticados + **63/63** matriz responsive completa). **Verificado.**
 
-### Fase 03.1 — Validación Real de Integración Supabase y Cierre de Fase 03 (2026-11-26 / 2026-11-27)
+### Fase 04 — Módulos Funcionales Completos (2026-11-27)
 
-| Categoría | Validación / Comando | Resultado real verificado | Estado |
+| Categoría | Comando | Resultado real verificado | Estado |
 | :--- | :--- | :--- | :--- |
-| Validación estática | `npx next typegen` | `✓ Types generated successfully` (`EXIT=0`) | **Verificado** |
-| Validación estática | `npm run lint` | `0` errores, `0` advertencias (`EXIT=0`) | **Verificado** |
-| Validación estática | `npm run typecheck` | `0` errores (`EXIT=0`) | **Verificado** |
-| Pruebas unitarias | `npm run test` | **5 archivos, 22/22 tests aprobados** en `1.46s` (`EXIT=0`) | **Verificado** |
-| Compilación | `npm run build` | Turbopack `4.4s` con `- Environments: .env.local`; `/` estático `○`, las 6 rutas privadas y 3 APIs dinámicos `ƒ`, `Proxy` activo (`EXIT=0`) | **Verificado** |
-| Integración real Supabase + Seguridad RLS | `npm run test:supabase-rls` | **`18/18` checks aprobados (`EXIT=0`)** contra el proyecto remoto usando solo Publishable Key y 2 usuarios reales independientes (`profiles`, `categories`, `transactions`, `budgets`) | **Verificado** |
-| Pruebas E2E autenticadas, sesiones y matriz responsive restante | `npm run verify:phase03` | **`EXIT=0`**: 6/6 redirecciones no autenticadas (`?next=`), `GET`/`PATCH /api/profile` → `401` JSON + `no-store`, cross-origin `POST /api/auth/signout` → `403`, open-redirect bloqueado, login inválido real contra Supabase Auth, login real en UI, recarga persistente, redirección autenticada desde `/login` y `/register`, acceso a 6/6 rutas privadas, 12 categorías reales visibles, `GET /api/profile` `200` + `no-store`, `PATCH /api/profile` persistente tras recarga, cierre de sesión + bloqueo en navegación atrás, **21/21 checks responsive restantes** (`/register`, `/categories`, `/settings` × 7 resoluciones = **63/63 matriz completa**), 5 capturas autenticadas + grabación WebM, `0` errores de consola/página | **Verificado** |
-| Envío y clic real de correo SMTP de confirmación | Flujo `/register` → bandeja de entrada → `/auth/callback?code=` | `mailer_autoconfirm: false` verificado en `/auth/v1/settings` y handler `/auth/callback` probado contra open-redirect; no se enviaron correos reales a buzones externos durante QA automatizado para respetar los límites SMTP del plan gratuito | **Pendiente (verificación manual con buzón real antes de producción)** |
-
-#### Detalle de los 18 Checks Reales de PostgreSQL y RLS (`npm run test:supabase-rls`)
-1. `anon-denied-all-4-tables`: **PASS** — `profiles:42501, categories:42501, transactions:42501, budgets:42501`
-2. `auth-two-independent-users`: **PASS** — `userA != userB` (sesiones independientes reales)
-3. `auto-profile-created-and-readable`: **PASS** — `currency=USD, tz=America/El_Salvador`
-4. `profile-update-own`: **PASS** — `OK`
-5. `rls-profiles-isolation`: **PASS** — `bRead=0, bUpd=0, intact=true`
-6. `auto-12-initial-categories-utf8`: **PASS** — `defaults=12 (income=4, expense=8, utf8Clean=true)`
-7. `new-user-starts-clean-no-demo-data`: **PASS** — `initialTx=0, initialBudgets=0`
-8. `categories-own-insert-update`: **PASS** — `OK`
-9. `rls-categories-isolation-and-no-transfer`: **PASS** — `bRead=0, bUpd=0, bDel=0, bInsErr=42501, transferErr=42501`
-10. `constraints-reject-invalid-amounts`: **PASS** — `zero=23514, neg=23514, overMax=23514`
-11. `constraints-category-type-and-owner-fk`: **PASS** — `badType=23503, foreignCat=23503`
-12. `transactions-own-insert-update`: **PASS** — `OK`
-13. `constraint-reject-delete-category-with-tx`: **PASS** — `23503`
-14. `rls-transactions-isolation-and-no-transfer`: **PASS** — `bRead=0, bUpd=0, bDel=0, bInsErr=42501, transferErr=42501`
-15. `constraints-budgets-expense-only-first-day-unique`: **PASS** — `incomeErr=23503, badDayErr=23514, dupErr=23505`
-16. `budgets-own-update`: **PASS** — `OK`
-17. `rls-budgets-isolation-and-no-transfer`: **PASS** — `bRead=0, bUpd=0, bDel=0, bInsErr=42501, transferErr=42501`
-18. `own-delete-tx-budget-and-unlinked-category`: **PASS** — `OK`
+| Tipos Next.js | `npx next typegen` | `✓ Types generated successfully` (`EXIT=0`) | **Verificado** |
+| Linter | `npm run lint` | `0` errores, `0` advertencias (`EXIT=0`) | **Verificado** |
+| TypeScript | `npm run typecheck` | `0` errores (`EXIT=0`) | **Verificado** |
+| Pruebas unitarias | `npm run test` | **7 archivos, 32/32 tests aprobados** (`EXIT=0`) | **Verificado** |
+| Build de producción | `npm run build` | Turbopack `3.3s` con `- Environments: .env.local`; `/` estático `○`, 6 rutas privadas + 11 Route Handlers dinámicos `ƒ`, `Proxy` activo (`EXIT=0`) | **Verificado** |
+| Seguridad de paquetes | `npm audit --audit-level=moderate` | **`found 0 vulnerabilities`** (`EXIT=0`) | **Verificado** |
+| Regresión PostgreSQL + RLS | `npm run test:supabase-rls` | **`18/18` checks aprobados** (`mailerAutoConfirm: false`, `initialTx=0, initialBudgets=0`, `EXIT=0`) | **Verificado** |
+| Seguridad API + Escenario financiero determinista | `npm run test:api-security` | **`42/42` checks aprobados (`EXIT=0`)**: `401` + `no-store` en 9 endpoints sin sesión (antes de validación `400`), UUID inválido `400`, inexistente `404`, cross-origin `403`, duplicados `409`, borrado/cambio de tipo de categoría vinculada `409`, paginación con totales `BigInt` completos, 4 estados de presupuesto (`warning` → `limit_reached` → `exceeded`), paridad Dashboard/Reportes (`+$1,200` acumulado, `+$1,000 / -$200 / +$800`, `+100%` vs junio), CSV con bytes BOM `EF BB BF` y fórmulas neutralizadas, y aislamiento total Usuario B vs Usuario A | **Verificado** |
+| E2E completo + CSV real + Responsive 9×7 con datos reales | `npm run verify:phase04` | **`18/18` checks aprobados (`EXIT=0`)**: login UI, CRUD categorías, CRUD transacciones (crear, editar, eliminar en diálogo, búsqueda con debounce), presupuestos (`Cerca del límite`, duplicado `409`, edición a `Superado`), bloqueo `409` de categoría en uso, dashboard real con gráficos Recharts y cambio de período + recarga, descarga real de archivo `fintrack-transacciones-2026-11-27.csv` verificada desde disco, **63/63 matriz responsive (9 rutas × 7 resoluciones) con datos reales y `0px` de desbordamiento**, 6 capturas PNG + grabación WebM (`16.7 MB`), **`0` errores de consola y `0` page errors** | **Verificado** |
+| Regresión Fase 03 | `npm run verify:phase03` | **`EXIT=0`**: 6/6 redirecciones, 3/3 APIs protegidas, open-redirect bloqueado, 15/15 flujos autenticados, 21/21 checks responsive, `0` errores de consola/página | **Verificado** |
+| Registro público SMTP y clic en correo real | Flujo `/register` → bandeja real → `/auth/callback?code=` | `Confirm email` permanece activo (`mailer_autoconfirm: false`). La creación de cuentas QA con *Auto Confirm User* no demuestra entrega SMTP pública; permanece como validación obligatoria previa al cierre de despliegue en Fase 06 | **Pendiente (Fase 06)** |

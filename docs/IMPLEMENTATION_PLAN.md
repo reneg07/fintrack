@@ -538,3 +538,15 @@ Sin modificar el historial original de la Fase 01, se registran los siguientes a
 2. **Walkthrough obligatorio por fase:** Se incorporó en `AGENTS.md` y `.agents/rules/fintrack-standards.md` la generación obligatoria de `walkthrough.md` (artefacto Antigravity) y copias versionadas en `docs/walkthroughs/`.
 3. **Simplificación de renderizado en `next.config.ts` (ADR-009):** Se removieron `cacheComponents: true` y `partialPrefetching: true` antes de integrar Supabase SSR para mantener un renderizado dinámico por petición claro, determinista y seguro en rutas autenticadas, preservando el prerenderizado estático en las rutas públicas y `Cache-Control: no-store, private` en APIs privadas.
 4. **Tipografía Geist autoalojada:** Se adoptó `geist@1.9.2` (`geist/font/sans` y `geist/font/mono`) para garantizar compilaciones deterministas sin dependencia externa de Google Fonts.
+
+
+---
+
+## Adenda Fase 04 — Módulos Funcionales Completos (2026-11-27)
+
+Durante la ejecución autorizada de la Fase 04 (`PROMPT-004`) se concretaron los siguientes refinamientos alineados con el plan maestro y las ADRs previas:
+1. **Motor Exacto `BigInt` (`ADR-011`):** Implementado en `src/lib/money.ts`, `src/lib/financial-aggregations.ts` y todos los servicios financieros (`src/services/*.service.ts`), transportando totales agregados como cadenas exactas `ExactCents` (`string`) y aislando la proyección numérica `exactCentsToChartNumber` exclusivamente al trazado visual en Recharts.
+2. **Agregaciones Completas sin Truncamiento (`ADR-013`):** Implementación de `fetchAllUserTransactions` y `computeFilteredExactTotals` mediante barrido paginado en lotes ordenados determinísticamente de `1000` filas para evitar truncamientos en dashboard, presupuestos, reportes, totales filtrados y exportación CSV, sin requerir migraciones SQL adicionales.
+3. **Presupuestos de 4 Estados:** Extensión de `BudgetStatus` y `BudgetProgress` con el estado exacto `"limit_reached"` (`100.0%` exacto) adicional a `"healthy"`, `"warning"` y `"exceeded"`.
+4. **Orden Defensivo de Route Handlers:** Todos los 9 Route Handlers financieros nuevos validan `isValidSameOrigin` (en mutaciones) → `requireAuthenticatedContext()` (`401`) → validación de parámetros/cuerpo Zod (`400`) antes de invocar los servicios.
+5. **Comparativas Seguras sin Base Cero:** `calculateComparisonPercentage` devuelve `null` cuando el período previo suma `0`, mostrando la etiqueta honesta `"Sin base previa"` en `/reports`.

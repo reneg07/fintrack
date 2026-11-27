@@ -126,3 +126,43 @@ Este documento registra de forma verídica, cronológica e iterativa el proceso 
 
 ### Estado final de la Fase 03
 - **Completada y verificada técnicamente contra Supabase real**, manteniendo `Confirm email` activo para producción (con la comprobación manual de entrega de correo real SMTP documentada como validación previa al despliegue en Fase 06).
+
+
+---
+
+## Fase 04 — Implementación de Módulos Funcionales Completos (`PROMPT-004`, 2026-11-27)
+
+### Prompt y Alcance
+- Registrado íntegramente en [`docs/prompts/004-functional-modules.md`](./docs/prompts/004-functional-modules.md).
+- Objetivo: conectar de extremo a extremo los 6 módulos privados (`/categories`, `/transactions`, `/budgets`, `/dashboard`, `/reports`, `/settings`) contra Supabase PostgreSQL real, implementando ADR-011 (`BigInt` + `ExactCents`), protección contra truncamiento de agregaciones, presupuestos de 4 estados, exportación CSV segura y pruebas unitarias, de seguridad API y E2E en navegador real.
+
+### Arquitectura de Estado (`useState` y `useEffect`) Documentada
+- **`src/hooks/use-debounce.ts`**: utiliza `useState` + `useEffect` con `setTimeout` y limpieza (`clearTimeout`) para estabilizar búsquedas de texto (`300 ms`) antes de invocar `GET /api/transactions`.
+- **`src/components/transactions/transactions-manager.tsx`**: `useState` para filtros (`searchInput`, `typeFilter`, `categoryFilter`, `fromDate`, `toDate`, `page`), estado de modales (`isFormOpen`, `editingTx`, `deletingTx`) y resultados paginados; `useEffect` con `AbortController` para consultas abortables a `GET /api/transactions` y sincronización de categoría compatible al alternar entre ingreso y gasto.
+- **`src/components/budgets/budgets-manager.tsx`**: `useState` para mes seleccionado y modales CRUD; `useEffect` con `AbortController` al cambiar mes (`GET /api/budgets?month=...`).
+- **`src/components/dashboard/dashboard-client.tsx`** y **`src/components/reports/reports-client.tsx`**: `useState` para período/rango personalizado y filtros CSV; `useEffect` con `AbortController` para recargar `GET /api/dashboard` y `GET /api/reports` sin condiciones de carrera.
+- **`src/components/categories/categories-view.tsx`**: `useState` para filtro de pestañas, modales de creación/edición y diálogo de confirmación de borrado seguro (`409 Conflict`).
+
+### Decisiones Técnicas y Defectos Reales Detectados y Resueltos Durante la Iteración
+1. **Regla React 19 `react-hooks/set-state-in-effect` en ESLint:** Al escribir los efectos de consulta en `transactions-manager.tsx`, ESLint señaló correctamente que llamar `setState` de forma síncrona al inicio de `useEffect` puede inducir renders en cascada. Se refactorizaron `transactions-manager.tsx`, `budgets-manager.tsx`, `dashboard-client.tsx` y `reports-client.tsx` para derivar el estado de carga (`const isLoading = settledKey !== requestKey`) y los errores de rango de fechas sin `setState` síncrono dentro de `useEffect`.
+2. **Orden de seguridad en Route Handlers (`401` antes de `400`):** La primera ejecución de `npm run test:api-security` detectó que `POST /api/categories`, `POST /api/transactions` y `POST /api/budgets` devolvían HTTP `400` antes de HTTP `401` cuando un cliente no autenticado enviaba un JSON vacío. Se endurecieron los 9 Route Handlers nuevos (`88b914c`) ejecutando `requireAuthenticatedContext()` inmediatamente después de `isValidSameOrigin()` y antes de parsear JSON, UUIDs o esquemas Zod.
+3. **Verificación de bytes crudos UTF-8 BOM y trim de Zod en CSV:** `Response.text()` elimina automáticamente el BOM UTF-8 (`EF BB BF`) al decodificar y Zod aplica `.trim()` a `notes`. Se actualizó la aserción en `scripts/test-api-security.mjs` para inspeccionar los bytes crudos (`await csvRes.body()` → `0xEF 0xBB 0xBF`) y confirmar la neutralización exacta de fórmulas (`'=SUM(...)`, `'+cmd|...`).
+4. **Latencia real contra Supabase remoto en pruebas E2E:** En la primera corrida de `verify:phase04`, las esperas fijas de `700–800 ms` resultaron insuficientes frente a la latencia real con West US (Oregon) en eliminación y búsqueda con debounce (`16/18`). Se reemplazaron por esperas deterministas (`waitFor` sobre estado del DOM y toasts), logrando `18/18` aprobados.
+5. **Inspección visual real de capturas (donas recortadas y captura prematura):** Al revisar visualmente las 6 capturas `phase-04-*.png`, se detectó que `ExactExpenseCategoryChart` recortaba lateralmente la dona en columnas de 1/3 de ancho en escritorio (`phase-04-dashboard-desktop.png` y `phase-04-reports.png`) y que `phase-04-budgets.png` se había capturado antes de cerrarse el modal de edición. Se ajustó el layout a apilamiento vertical centrado (`9a69358`) y se añadió espera explícita al cierre del `Dialog`, confirmando visualmente todas las capturas finales.
+
+### Commits Reales de la Fase 04
+- `edd0890` — `feat: implement exact monetary aggregations and validation schemas`
+- `78796cf` — `feat: implement category management`
+- `ebd4742` — `feat: implement transaction CRUD and filters`
+- `c46e7b4` — `feat: implement monthly budget tracking`
+- `de70f37` — `feat: integrate real financial dashboard`
+- `7295a98` — `feat: implement financial reports and secure CSV export`
+- `c4189f8` — `test: validate financial calculations`
+- `88b914c` — `fix: enforce authentication before input validation in financial APIs`
+- `45fd175` — `test: verify financial API authorization`
+- `9a69358` — `fix: prevent donut chart clipping in narrow desktop cards`
+- `b254bdb` — `test: add end-to-end financial workflows`
+
+### Estado Real de Cierre
+- **Implementado y Verificado:** Todos los módulos funcionales, 11 Route Handlers financieros, motor `BigInt` ADR-011, exportación CSV segura, `32/32` Vitest, `42/42` seguridad API + escenario determinista, `18/18` Playwright E2E + descarga CSV real + `63/63` responsive con datos reales, `18/18` regresión RLS, `15/15` regresión Fase 03 y `0` vulnerabilidades en `npm audit`.
+- **Pendiente para Fase 06:** Validación manual integral de registro público con envío real de correo SMTP y clic en `/auth/callback` antes de cerrar producción.
