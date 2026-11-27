@@ -1,36 +1,58 @@
 import type { Metadata } from "next";
-import Link from "next/link";
-import { BarChart3 } from "lucide-react";
-import { buttonVariants } from "@/components/ui/button";
-import { EmptyState } from "@/components/shared/empty-state";
-import { PageHeader } from "@/components/shared/page-header";
+import { ReportsClient } from "@/components/reports/reports-client";
+import { getRecentMonthOptions, resolvePeriodRange } from "@/lib/dates";
+import { listCategoriesWithUsage } from "@/services/categories.service";
+import { getReportsData } from "@/services/reports.service";
+import type { ReportsPayload } from "@/types/domain";
 
 export const metadata: Metadata = {
   title: "Reportes",
   description: "Análisis financiero mensual y exportación CSV en FinTrack.",
 };
 
-export default function ReportsPage() {
-  return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Reportes"
-        description="Comparaciones mensuales, evolución de ingresos y gastos y exportación CSV."
-      />
-
-      <EmptyState
-        icon={BarChart3}
-        title="Sin datos suficientes para generar reportes"
-        description="Cuando registres tus movimientos en la Fase 04, aquí verás comparaciones mensuales, evolución del flujo neto y la descarga de transacciones en formato CSV sanitizado."
-        action={
-          <Link
-            href="/dashboard"
-            className={buttonVariants({ variant: "outline" })}
-          >
-            Volver al resumen
-          </Link>
+export default async function ReportsPage() {
+  const defaultResolved = resolvePeriodRange("last_6_months");
+  const emptyReport: ReportsPayload = {
+    period: defaultResolved.periodKey,
+    periodLabel: defaultResolved.label,
+    range: {
+      start: defaultResolved.start,
+      endInclusive: defaultResolved.endInclusive,
+      endExclusive: defaultResolved.endExclusive,
+    },
+    previousRange: defaultResolved.previousRange
+      ? {
+          start: defaultResolved.previousRange.start,
+          endInclusive: defaultResolved.previousRange.endInclusive,
         }
-      />
-    </div>
+      : null,
+    summary: {
+      incomeCents: "0",
+      expenseCents: "0",
+      netCents: "0",
+      transactionCount: 0,
+    },
+    comparisons: {
+      income: null,
+      expense: null,
+      net: null,
+    },
+    monthlySeries: [],
+    expenseBreakdown: [],
+  };
+
+  const [initialData, categories] = await Promise.all([
+    getReportsData({ period: "last_6_months" }).catch(() => emptyReport),
+    listCategoriesWithUsage().catch(() => []),
+  ]);
+
+  const monthOptions = getRecentMonthOptions(6);
+
+  return (
+    <ReportsClient
+      initialData={initialData}
+      categories={categories}
+      monthOptions={monthOptions}
+    />
   );
 }
