@@ -262,6 +262,10 @@ export function sumCents(values: readonly number[]): number {
 
 /**
  * Computes exact budget consumption percentage (rounded to 1 decimal place) using BigInt arithmetic.
+ * Guarantees visual display never contradicts exact status:
+ * - strictly below limit (< 100%) never rounds up to 100.0% (capped at 99.9%)
+ * - strictly above limit (> 100%) never rounds down to 100.0% (floored at 100.1%)
+ * - 100.0% is returned exclusively when spent === limit.
  */
 export function calculateExactBudgetPercentage(
   spentCents: bigint | string | number,
@@ -275,8 +279,17 @@ export function calculateExactBudgetPercentage(
   if (spent <= ZERO) {
     return 0;
   }
+  if (spent === limit) {
+    return 100;
+  }
   // Round half-up to 1 decimal place using scaled BigInt: (spent * 1000 + limit/2) / limit
   const tenths = (spent * BigInt(1000) + limit / BigInt(2)) / limit;
+  if (spent < limit && tenths >= BigInt(1000)) {
+    return 99.9;
+  }
+  if (spent > limit && tenths <= BigInt(1000)) {
+    return 100.1;
+  }
   return Number(tenths) / 10;
 }
 

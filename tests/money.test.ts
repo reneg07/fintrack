@@ -126,6 +126,14 @@ describe("money utilities (integer cents & ADR-011 BigInt precision)", () => {
       status: "exceeded",
     });
 
+    // Boundary display consistency: strictly below 100% never displays 100.0%, strictly above 100% never displays 100.0%
+    expect(getExactBudgetStatus(99_999, 100_000, 80)).toBe("warning");
+    expect(calculateExactBudgetPercentage(99_999, 100_000)).toBe(99.9);
+    expect(getExactBudgetStatus(100_000, 100_000, 80)).toBe("limit_reached");
+    expect(calculateExactBudgetPercentage(100_000, 100_000)).toBe(100);
+    expect(getExactBudgetStatus(100_001, 100_000, 80)).toBe("exceeded");
+    expect(calculateExactBudgetPercentage(100_001, 100_000)).toBe(100.1);
+
     // Legacy 3-state helper stays backward compatible
     expect(getBudgetStatus(10_000, 10_000, 80)).toBe("exceeded");
   });
