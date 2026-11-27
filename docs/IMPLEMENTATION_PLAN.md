@@ -526,3 +526,15 @@ Durante la inicialización en **Fase 02** (manteniendo el directorio limpio ante
 - **Fase 06 (Publicación y Despliegue)**:
   1. Crear el repositorio público en GitHub y proporcionar su URL remota (y autenticación Git si el equipo aún no la tiene almacenada).
   2. Autorizar la cuenta gratuita en Vercel e ingresar las variables de entorno de producción (o autenticar `npx vercel login`) y agregar la URL final de Vercel en Supabase Auth (`Site URL` / `Redirect URLs`).
+
+
+---
+
+## Adenda — Fase 03 (2026-11-26)
+
+Sin modificar el historial original de la Fase 01, se registran los siguientes ajustes arquitectónicos aprobados y verificados al iniciar la Fase 03:
+
+1. **Verificación visual mediante Playwright aislado:** Ante la ausencia de depuración remota activa (`DevToolsActivePort`) en el perfil Chrome local, se incorporó `playwright` como `devDependency` con scripts reutilizables (`scripts/run-with-server.mjs`, `scripts/verify-phase-02.mjs`) para ejecutar auditorías en navegador aislado sin modificar el perfil personal del usuario.
+2. **Walkthrough obligatorio por fase:** Se incorporó en `AGENTS.md` y `.agents/rules/fintrack-standards.md` la generación obligatoria de `walkthrough.md` (artefacto Antigravity) y copias versionadas en `docs/walkthroughs/`.
+3. **Simplificación de renderizado en `next.config.ts` (ADR-009):** Se removieron `cacheComponents: true` y `partialPrefetching: true` antes de integrar Supabase SSR para mantener un renderizado dinámico por petición claro, determinista y seguro en rutas autenticadas, preservando el prerenderizado estático en las rutas públicas y `Cache-Control: no-store, private` en APIs privadas.
+4. **Tipografía Geist autoalojada:** Se adoptó `geist@1.9.2` (`geist/font/sans` y `geist/font/mono`) para garantizar compilaciones deterministas sin dependencia externa de Google Fonts.

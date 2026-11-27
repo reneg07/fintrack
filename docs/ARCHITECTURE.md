@@ -48,9 +48,17 @@ flowchart TD
 - **Decisión:** Resolver fechas calendario (`YYYY-MM-DD`), mes actual (`YYYY-MM`) y formateo en español (`es-SV`) explícitamente contra `America/El_Salvador` (UTC-6, sin DST).
 - **Motivo:** Evitar desfases de día o mes en transacciones registradas en horario nocturno local frente a servidores en UTC.
 
-### ADR-003 — Next.js 16 con `cacheComponents` y Cabeceras de Seguridad (`next.config.ts`)
-- **Decisión:** Conservar la configuración oficial estable de Next.js 16.4.6 (`cacheComponents: true`, `partialPrefetching: true`, Turbopack CSS loader) agregando cabeceras HTTP de seguridad (`X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`).
-- **Implicación para Fase 03:** Al leer cookies de Supabase en Server Components, toda lectura por petición deberá encapsularse dentro de límites `<Suspense>` (o `loading.tsx`) según `node_modules/next/dist/docs/01-app/02-guides/authentication-with-cache-components.md`.
+### ADR-003 — Cabeceras de Seguridad y Simplificación de Caché en Next.js 16 (Actualizado en Fase 03 — ver ADR-009)
+- **Decisión inicial (Fase 02):** Se conservaron los defaults del scaffold (`cacheComponents: true`, `partialPrefetching: true`) y se agregaron cabeceras HTTP de seguridad (`X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`) en `next.config.ts`.
+- **Revisión (Fase 03 — ADR-009):** Se deshabilitaron `cacheComponents` y `partialPrefetching` antes de introducir Supabase Auth y datos financieros privados.
+
+### ADR-009 — Renderizado Dinámico por Petición sin `cacheComponents` en Rutas Autenticadas (Fase 03)
+- **Contexto:** Next.js 16.4.6 habilita `cacheComponents: true` y `partialPrefetching: true` por defecto en `create-next-app`. Sin embargo, en FinTrack el 100% del área privada (`/dashboard`, `/transactions`, `/categories`, `/budgets`, `/reports`, `/settings`) y los Route Handlers (`/api/*`) dependen de cookies de sesión de usuario y datos financieros estrictamente privados.
+- **Decisión:** Eliminar `cacheComponents: true` y `partialPrefetching: true` de `next.config.ts`, adoptando el modelo clásico y estable del App Router de Next.js 16:
+  - Las páginas públicas (`/`, `/login`, `/register`) continúan prerenderizándose estáticamente (`○ Static`) sin pérdida de rendimiento.
+  - El layout privado `(app)/layout.tsx` y las rutas autenticadas leen `cookies()` dinámicamente por petición (`ƒ Dynamic`) con verificación autoritativa `supabase.auth.getUser()`, evitando cualquier riesgo de compartir datos entre usuarios o fallos de compilación por lecturas fuera de `<Suspense>`.
+  - Todos los Route Handlers privados envían `Cache-Control: no-store, private` y `Vary: Cookie`.
+- **Beneficio:** Arquitectura más simple, predecible y segura para un SaaS financiero multiusuario.
 
 ### ADR-004 — Resolución Limpia de `@types/node` para Vitest 5
 - **Decisión:** Actualizar `@types/node` a `^22` para coincidir con el runtime real (`Node.js v22.19.0`) y satisfacer la peer dependency de `vitest@5.1.2` sin recurrir a `--force` ni `--legacy-peer-deps`.
