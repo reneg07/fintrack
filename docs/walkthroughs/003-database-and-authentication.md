@@ -201,7 +201,7 @@ Para completar la verificación remota de la Fase 03 (`npm run test:supabase-rls
 1. Crea un proyecto gratuito en [https://supabase.com](https://supabase.com).
 2. En **Supabase Dashboard → SQL Editor → New query**, copia y pega el contenido completo de [`supabase/phase-03-setup.sql`](../../supabase/phase-03-setup.sql) y presiona **Run**.
 3. En **Authentication → URL Configuration**, establece **Site URL** = `http://localhost:3000` y agrega `http://localhost:3000/auth/callback` en **Redirect URLs**.
-4. En **Project Settings → API**, copia la **Project URL** y la **Publishable key** (nunca `service_role`) en un archivo nuevo `.env.local` en `C:\xampp\htdocs\vibe_coding\.env.local`:
+4. En **Project Settings → API**, copia la **Project URL** y la **Publishable key** (nunca `service_role`) en un archivo nuevo `.env.local` en la raíz del proyecto (`.env.local`):
    ```env
    NEXT_PUBLIC_SUPABASE_URL=https://tu-proyecto.supabase.co
    NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=tu-publishable-key

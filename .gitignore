@@ -39,6 +39,12 @@ yarn-error.log*
 .tmp/
 tmp/
 
+# playwright artifacts & auth state
+playwright-report/
+test-results/
+.auth/
+*.storageState.json
+
 # vercel
 .vercel
 

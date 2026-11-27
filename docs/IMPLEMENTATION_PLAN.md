@@ -10,11 +10,11 @@
 
 ## 1. Diagnóstico del Workspace y Entorno Local
 
-Inspección no destructiva ejecutada sobre `c:\xampp\htdocs\vibe_coding`:
+Inspección no destructiva ejecutada sobre la raíz del repositorio (`fintrack`):
 
 | Componente | Estado / Versión verificada | Observación |
 | :--- | :--- | :--- |
-| **Directorio de trabajo** | `c:\xampp\htdocs\vibe_coding` (`0` archivos) | Vacío y listo para inicialización limpia en Fase 02 |
+| **Directorio de trabajo** | Raíz del repositorio (`0` archivos) | Vacío y listo para inicialización limpia en Fase 02 |
 | **Sistema Operativo** | Windows 11 (`NT 10.0.26300.0`) | Shell PowerShell |
 | **Node.js** | `v22.19.0` | Compatible con Next.js 16 y `@supabase/supabase-js` (`>=22.0.0`) |
 | **npm / npx** | `10.9.3` / `10.9.3` | Gestor de paquetes seleccionado (sin instalaciones adicionales) |
@@ -129,7 +129,7 @@ Versiones estables verificadas contra documentación oficial y registro npm (nov
 ## 5. Estructura de Carpetas Propuesta
 
 ```text
-c:\xampp\htdocs\vibe_coding\
+fintrack/
 ├── .agents/
 │   └── rules/
 │       └── fintrack-standards.md       # Reglas persistentes nativas de Antigravity
