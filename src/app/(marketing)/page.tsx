@@ -92,9 +92,9 @@ const SECURITY_PILLARS = [
   {
     icon: Lock,
     title: "Sesiones en servidor y aislamiento por usuario",
-    status: "Arquitectura Fase 03",
+    status: "Implementado (Fase 03)",
     description:
-      "El diseño contempla sesiones HTTP gestionadas en servidor con Supabase SSR, validación estricta con Zod y políticas Row Level Security en PostgreSQL.",
+      "Sesiones HTTP gestionadas con Supabase SSR, validación estricta con Zod, protección de rutas en servidor y migraciones PostgreSQL con Row Level Security.",
   },
 ] as const;
 
@@ -190,10 +190,10 @@ export default function LandingPage() {
                 </p>
               </div>
               <Link
-                href="/dashboard"
+                href="/register"
                 className="inline-flex items-center gap-1 rounded-md border border-border bg-card px-2.5 py-1 text-xs font-medium text-foreground transition-colors hover:bg-secondary"
               >
-                Explorar demo
+                Crear cuenta
                 <ArrowUpRight className="size-3.5" aria-hidden="true" />
               </Link>
             </div>
@@ -464,13 +464,13 @@ export default function LandingPage() {
               <ArrowRight className="size-4" aria-hidden="true" />
             </Link>
             <Link
-              href="/dashboard"
+              href="/login"
               className={cn(
                 buttonVariants({ variant: "outline", size: "lg" }),
                 "h-11 border-white/25 bg-transparent px-5 text-sm font-medium text-white hover:bg-white/10 hover:text-white",
               )}
             >
-              Ver vista preliminar
+              Iniciar sesión
             </Link>
           </div>
         </div>

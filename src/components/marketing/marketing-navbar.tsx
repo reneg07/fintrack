@@ -19,7 +19,6 @@ const NAV_LINKS = [
   { href: "/#funcionalidades", label: "Funcionalidades" },
   { href: "/#como-funciona", label: "Cómo funciona" },
   { href: "/#seguridad", label: "Privacidad" },
-  { href: "/dashboard", label: "Vista preliminar" },
 ] as const;
 
 export function MarketingNavbar() {

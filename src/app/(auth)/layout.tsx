@@ -1,7 +1,9 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { ArrowLeft, CheckCircle2 } from "lucide-react";
 import { BrandLogo } from "@/components/shared/brand-logo";
+import { getAuthenticatedProfile } from "@/services/profile.service";
 
 const HIGHLIGHTS = [
   "Registro rápido de ingresos y gastos en dólares (USD).",
@@ -9,7 +11,16 @@ const HIGHLIGHTS = [
   "Reportes comparativos y exportación de movimientos a CSV.",
 ] as const;
 
-export default function AuthLayout({ children }: { children: ReactNode }) {
+export default async function AuthLayout({
+  children,
+}: {
+  children: ReactNode;
+}) {
+  const existingUser = await getAuthenticatedProfile();
+  if (existingUser) {
+    redirect("/dashboard");
+  }
+
   return (
     <div className="grid min-h-screen bg-background lg:grid-cols-[440px_1fr]">
       {/* Brand panel on desktop */}

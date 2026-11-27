@@ -2,12 +2,13 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Eye, EyeOff, Info, Lock } from "lucide-react";
+import { AlertCircle, Eye, EyeOff, Loader2, MailCheck } from "lucide-react";
 import { toast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -17,15 +18,22 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { mapAuthErrorMessage } from "@/lib/auth-errors";
+import { createClient } from "@/lib/supabase/client";
 import {
   registerSchema,
   type RegisterFormValues,
 } from "@/schemas/auth.schema";
+import { cn } from "@/lib/utils";
 
 export function RegisterForm() {
+  const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [phaseNoticeVisible, setPhaseNoticeVisible] = useState(false);
+  const [serverError, setServerError] = useState<string | null>(null);
+  const [confirmationEmail, setConfirmationEmail] = useState<string | null>(
+    null,
+  );
 
   const {
     register,
@@ -43,13 +51,84 @@ export function RegisterForm() {
     },
   });
 
-  function onSubmit() {
-    // Phase 02: strictly UI + Zod validation without fake accounts or localStorage persistence
-    setPhaseNoticeVisible(true);
-    toast.info("Formulario de registro validado", {
-      description:
-        "El registro real en Supabase Auth se habilitará en la Fase 03.",
-    });
+  async function onSubmit(values: RegisterFormValues) {
+    setServerError(null);
+
+    try {
+      const supabase = createClient();
+      const origin = window.location.origin;
+
+      const { data, error } = await supabase.auth.signUp({
+        email: values.email,
+        password: values.password,
+        options: {
+          data: {
+            full_name: values.fullName,
+          },
+          emailRedirectTo: `${origin}/auth/callback?next=/dashboard`,
+        },
+      });
+
+      if (error) {
+        setServerError(mapAuthErrorMessage(error, "register"));
+        return;
+      }
+
+      // Email confirmation enabled: Supabase creates the user without an active session
+      if (data.user && !data.session) {
+        setConfirmationEmail(values.email);
+        toast.success("Cuenta creada. Revisa tu correo para confirmarla.");
+        return;
+      }
+
+      // Email confirmation disabled: session is immediately active
+      toast.success("Cuenta creada e inicio de sesión completado");
+      router.replace("/dashboard");
+      router.refresh();
+    } catch (err) {
+      const fallbackMessage =
+        err instanceof Error ? err.message : undefined;
+      setServerError(
+        mapAuthErrorMessage({ message: fallbackMessage }, "register"),
+      );
+    }
+  }
+
+  if (confirmationEmail) {
+    return (
+      <Card className="border-border/90 bg-card shadow-none">
+        <CardHeader className="space-y-2 pb-3 text-center">
+          <span
+            aria-hidden="true"
+            className="mx-auto inline-flex size-12 items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 text-success-text"
+          >
+            <MailCheck className="size-6" />
+          </span>
+          <h1 className="font-heading text-2xl leading-snug font-semibold tracking-tight">
+            Confirma tu correo electrónico
+          </h1>
+          <CardDescription>
+            Enviamos un enlace de verificación a{" "}
+            <strong className="text-foreground">{confirmationEmail}</strong>.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4 text-center text-sm text-muted-foreground">
+          <p>
+            Abre el correo de confirmación y haz clic en el enlace para activar
+            tu cuenta y entrar a tu panel de FinTrack.
+          </p>
+          <Link
+            href="/login"
+            className={cn(
+              buttonVariants({ variant: "default" }),
+              "h-10 w-full",
+            )}
+          >
+            Ir a iniciar sesión
+          </Link>
+        </CardContent>
+      </Card>
+    );
   }
 
   return (
@@ -59,25 +138,25 @@ export function RegisterForm() {
           Crear cuenta
         </h1>
         <CardDescription>
-          Completa tus datos para preparar tu espacio personal en FinTrack.
+          Completa tus datos para crear tu espacio personal en FinTrack.
         </CardDescription>
       </CardHeader>
 
       <CardContent className="space-y-5">
-        <div
-          role="note"
-          className="flex items-start gap-2.5 rounded-lg border border-emerald-200/80 bg-emerald-50/70 p-3 text-xs text-brand-dark"
-        >
-          <Info
-            className="mt-0.5 size-4 shrink-0 text-success-text"
-            aria-hidden="true"
-          />
-          <p className="leading-relaxed">
-            <strong>Fase 02 (Interfaz y validación):</strong> las reglas de
-            validación están activas, pero la creación real de cuentas con
-            Supabase Auth se implementará en la Fase 03.
-          </p>
-        </div>
+        {serverError && (
+          <Alert
+            variant="destructive"
+            className="border-red-200 bg-red-50/80 text-danger-text"
+          >
+            <AlertCircle className="size-4" aria-hidden="true" />
+            <AlertTitle className="text-xs font-semibold text-danger-text">
+              No se pudo completar el registro
+            </AlertTitle>
+            <AlertDescription className="text-xs text-danger-text/90">
+              {serverError}
+            </AlertDescription>
+          </Alert>
+        )}
 
         <form
           onSubmit={handleSubmit(onSubmit)}
@@ -92,6 +171,7 @@ export function RegisterForm() {
               autoComplete="name"
               enterKeyHint="next"
               placeholder="Ej. María José Alvarado"
+              disabled={isSubmitting}
               aria-invalid={errors.fullName ? "true" : "false"}
               aria-describedby={
                 errors.fullName ? "register-name-error" : undefined
@@ -118,6 +198,7 @@ export function RegisterForm() {
               spellCheck={false}
               enterKeyHint="next"
               placeholder="nombre@ejemplo.com"
+              disabled={isSubmitting}
               aria-invalid={errors.email ? "true" : "false"}
               aria-describedby={
                 errors.email ? "register-email-error" : undefined
@@ -144,6 +225,7 @@ export function RegisterForm() {
                 autoComplete="new-password"
                 enterKeyHint="next"
                 placeholder="Mínimo 8 caracteres, letras y números"
+                disabled={isSubmitting}
                 aria-invalid={errors.password ? "true" : "false"}
                 aria-describedby={
                   errors.password ? "register-password-error" : undefined
@@ -154,6 +236,7 @@ export function RegisterForm() {
               <button
                 type="button"
                 onClick={() => setShowPassword((prev) => !prev)}
+                disabled={isSubmitting}
                 aria-label={
                   showPassword ? "Ocultar contraseña" : "Mostrar contraseña"
                 }
@@ -188,6 +271,7 @@ export function RegisterForm() {
                 autoComplete="new-password"
                 enterKeyHint="done"
                 placeholder="Repite tu contraseña"
+                disabled={isSubmitting}
                 aria-invalid={errors.confirmPassword ? "true" : "false"}
                 aria-describedby={
                   errors.confirmPassword
@@ -200,6 +284,7 @@ export function RegisterForm() {
               <button
                 type="button"
                 onClick={() => setShowConfirmPassword((prev) => !prev)}
+                disabled={isSubmitting}
                 aria-label={
                   showConfirmPassword
                     ? "Ocultar confirmación de contraseña"
@@ -225,32 +310,19 @@ export function RegisterForm() {
             )}
           </div>
 
-          {phaseNoticeVisible && (
-            <Alert className="border-emerald-200 bg-emerald-50/80 text-brand-dark">
-              <Lock className="size-4 text-success-text" aria-hidden="true" />
-              <AlertTitle className="text-xs font-semibold">
-                Validación correcta — Registro pendiente de Fase 03
-              </AlertTitle>
-              <AlertDescription className="text-xs text-brand-dark/90">
-                No se ha creado ninguna cuenta ni se almacenaron tus datos.
-                Puedes explorar la vista preliminar en{" "}
-                <Link
-                  href="/dashboard"
-                  className="font-semibold underline underline-offset-2"
-                >
-                  /dashboard
-                </Link>
-                .
-              </AlertDescription>
-            </Alert>
-          )}
-
           <Button
             type="submit"
             disabled={isSubmitting}
             className="h-10 w-full text-sm font-medium"
           >
-            Crear cuenta
+            {isSubmitting ? (
+              <>
+                <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                Creando cuenta...
+              </>
+            ) : (
+              "Crear cuenta"
+            )}
           </Button>
         </form>
       </CardContent>

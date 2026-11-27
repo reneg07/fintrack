@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Eye, EyeOff, Info, Lock } from "lucide-react";
+import { AlertCircle, Eye, EyeOff, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -17,11 +18,22 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { mapAuthErrorMessage } from "@/lib/auth-errors";
+import { createClient } from "@/lib/supabase/client";
 import { loginSchema, type LoginFormValues } from "@/schemas/auth.schema";
 
-export function LoginForm() {
+interface LoginFormProps {
+  nextPath?: string;
+  initialError?: string | null;
+}
+
+export function LoginForm({
+  nextPath = "/dashboard",
+  initialError = null,
+}: LoginFormProps) {
+  const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
-  const [phaseNoticeVisible, setPhaseNoticeVisible] = useState(false);
+  const [serverError, setServerError] = useState<string | null>(initialError);
 
   const {
     register,
@@ -37,13 +49,31 @@ export function LoginForm() {
     },
   });
 
-  function onSubmit() {
-    // Phase 02: strictly UI + Zod validation without fake sessions or storage
-    setPhaseNoticeVisible(true);
-    toast.info("Validación de formulario verificada", {
-      description:
-        "La autenticación real con Supabase Auth se habilitará en la Fase 03.",
-    });
+  async function onSubmit(values: LoginFormValues) {
+    setServerError(null);
+
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.auth.signInWithPassword({
+        email: values.email,
+        password: values.password,
+      });
+
+      if (error) {
+        setServerError(mapAuthErrorMessage(error, "login"));
+        return;
+      }
+
+      toast.success("Sesión iniciada correctamente");
+      router.replace(nextPath);
+      router.refresh();
+    } catch (err) {
+      const fallbackMessage =
+        err instanceof Error ? err.message : undefined;
+      setServerError(
+        mapAuthErrorMessage({ message: fallbackMessage }, "login"),
+      );
+    }
   }
 
   return (
@@ -59,20 +89,20 @@ export function LoginForm() {
       </CardHeader>
 
       <CardContent className="space-y-5">
-        <div
-          role="note"
-          className="flex items-start gap-2.5 rounded-lg border border-emerald-200/80 bg-emerald-50/70 p-3 text-xs text-brand-dark"
-        >
-          <Info
-            className="mt-0.5 size-4 shrink-0 text-success-text"
-            aria-hidden="true"
-          />
-          <p className="leading-relaxed">
-            <strong>Fase 02 (Interfaz y validación):</strong> este formulario
-            valida los campos con Zod, pero la autenticación real con Supabase
-            se integrará en la Fase 03.
-          </p>
-        </div>
+        {serverError && (
+          <Alert
+            variant="destructive"
+            className="border-red-200 bg-red-50/80 text-danger-text"
+          >
+            <AlertCircle className="size-4" aria-hidden="true" />
+            <AlertTitle className="text-xs font-semibold text-danger-text">
+              No se pudo iniciar sesión
+            </AlertTitle>
+            <AlertDescription className="text-xs text-danger-text/90">
+              {serverError}
+            </AlertDescription>
+          </Alert>
+        )}
 
         <form
           onSubmit={handleSubmit(onSubmit)}
@@ -88,6 +118,7 @@ export function LoginForm() {
               spellCheck={false}
               enterKeyHint="next"
               placeholder="nombre@ejemplo.com"
+              disabled={isSubmitting}
               aria-invalid={errors.email ? "true" : "false"}
               aria-describedby={errors.email ? "login-email-error" : undefined}
               className="h-10 bg-white"
@@ -112,6 +143,7 @@ export function LoginForm() {
                 autoComplete="current-password"
                 enterKeyHint="done"
                 placeholder="Ingresa tu contraseña"
+                disabled={isSubmitting}
                 aria-invalid={errors.password ? "true" : "false"}
                 aria-describedby={
                   errors.password ? "login-password-error" : undefined
@@ -122,6 +154,7 @@ export function LoginForm() {
               <button
                 type="button"
                 onClick={() => setShowPassword((prev) => !prev)}
+                disabled={isSubmitting}
                 aria-label={
                   showPassword ? "Ocultar contraseña" : "Mostrar contraseña"
                 }
@@ -145,32 +178,19 @@ export function LoginForm() {
             )}
           </div>
 
-          {phaseNoticeVisible && (
-            <Alert className="border-emerald-200 bg-emerald-50/80 text-brand-dark">
-              <Lock className="size-4 text-success-text" aria-hidden="true" />
-              <AlertTitle className="text-xs font-semibold">
-                Datos válidos — Conexión pendiente de Fase 03
-              </AlertTitle>
-              <AlertDescription className="text-xs text-brand-dark/90">
-                No se ha creado ninguna sesión simulada ni se almacenó tu
-                contraseña. Puedes revisar la vista preliminar en{" "}
-                <Link
-                  href="/dashboard"
-                  className="font-semibold underline underline-offset-2"
-                >
-                  /dashboard
-                </Link>
-                .
-              </AlertDescription>
-            </Alert>
-          )}
-
           <Button
             type="submit"
             disabled={isSubmitting}
             className="h-10 w-full text-sm font-medium"
           >
-            Iniciar sesión
+            {isSubmitting ? (
+              <>
+                <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                Verificando credenciales...
+              </>
+            ) : (
+              "Iniciar sesión"
+            )}
           </Button>
         </form>
       </CardContent>
