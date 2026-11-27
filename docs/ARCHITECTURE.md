@@ -1,6 +1,6 @@
 # Arquitectura de Software — FinTrack
 
-> **Estado actual:** **Fase 04 completada y verificada** contra Supabase PostgreSQL real. Todos los módulos privados (`/dashboard`, `/transactions`, `/categories`, `/budgets`, `/reports`, `/settings`) operan mediante Server Components + Client Components + 11 Route Handlers internos con autenticación autoritativa `getUser()`, RLS por usuario, motor monetario exacto `BigInt` (ADR-011) y exportación CSV sanitizada.
+> **Estado actual:** **Fase 05 auditada, optimizada y verificada** contra Supabase PostgreSQL real (`36/36` unitarias, `18/18` RLS, `42/42` seguridad API, `18/18` E2E Fase 04 + `63/63` responsive, `24/24` Fase 05 incluyendo volumen real de `1,005` filas en Supabase e instalación limpia reproducible `npm ci` + `npm run build`). Listo para despliegue en Fase 06.
 
 ## 1. Arquitectura General, Autenticación y Flujo de Datos (Fase 04)
 
@@ -136,6 +136,8 @@ Todos los Route Handlers privados aplican el mismo orden defensivo:
   - `formatExactCurrency` y `exactCentsToDecimalString` (`src/lib/money.ts`) formatean mediante división entera `BigInt` sin pasar por `number` IEEE-754, verificado con pruebas unitarias por encima de `Number.MAX_SAFE_INTEGER` (`$108,000,000,000,000.01`).
   - La conversión a `number` queda confinada exclusivamente a `exactCentsToChartNumber` para coordenadas de trazado en Recharts, mientras tooltips, KPIs, tablas y CSV leen los valores exactos `ExactCents`.
 - **ADR-012 — Gestión del Historial de Migraciones Aplicadas vía SQL Editor:** Nunca alterar migraciones ya aplicadas; toda evolución SQL futura entra como nueva migración idempotente con timestamp posterior. En Fase 04 no se requirió ninguna migración SQL nueva.
-- **ADR-013 — Agregaciones Completas sin Truncamiento PostgREST y Estado Derivado React 19 [Implementado y Verificado en Fase 04]:**
-  - `fetchAllUserTransactions` y `computeFilteredExactTotals` recorren lotes ordenados determinísticamente de `1000` filas (`.range(offset, offset + 999)` con desempate `occurred_on DESC, created_at DESC, id DESC`) para garantizar que dashboard, presupuestos, reportes, totales filtrados y exportación CSV nunca se trunquen en el límite por defecto de PostgREST ni en la página visible.
-  - Los Client Components interactivos derivan `isLoading` comparando `settledKey !== requestKey`, cumpliendo estrictamente `react-hooks/set-state-in-effect` de React 19 sin renders en cascada y cancelando peticiones obsoletas con `AbortController`.
+- **ADR-013 — Agregaciones Completas sin Truncamiento PostgREST, Deduplicación Multi-lote y Memoización por Petición [Reforzado y Verificado en Fase 05]:**
+  - `collectPaginatedBatches` (`src/lib/batch-pagination.ts`) recorre lotes ordenados determinísticamente de `1000` filas con deduplicación por `id` (`seenIds`) y propagación estricta de errores en lotes intermedios (verificado unitariamente hasta `2,500` filas y en vivo contra Supabase con `1,005` filas reales).
+  - `requireAuthenticatedContext()` (`src/services/_auth.ts`) usa `React.cache()` estrictamente por petición HTTP para evitar llamadas redundantes a `supabase.auth.getUser()` entre layout, Server Components, Route Handlers y servicios (reduciendo latencias de API de ~750–815 ms a `541–568 ms`).
+  - `listTransactions` calcula totales en memoria cuando la página 1 contiene todos los resultados y `budgets.service.ts` usa `fetchExpenseTotalsByCategory` ligero (`id, category_id, amount_cents`).
+  - Los Client Components derivan `isLoading` vía `settledKey !== requestKey`, cancelan peticiones obsoletas con `AbortController`, redirigen limpiamente ante HTTP `401` y muestran `<ErrorAlert>` en lugar de cifras `$0.00` engañosas cuando ocurre un fallo de servidor o red.

@@ -166,3 +166,30 @@ Este documento registra de forma verídica, cronológica e iterativa el proceso 
 ### Estado Real de Cierre
 - **Implementado y Verificado:** Todos los módulos funcionales, 11 Route Handlers financieros, motor `BigInt` ADR-011, exportación CSV segura, `32/32` Vitest, `42/42` seguridad API + escenario determinista, `18/18` Playwright E2E + descarga CSV real + `63/63` responsive con datos reales, `18/18` regresión RLS, `15/15` regresión Fase 03 y `0` vulnerabilidades en `npm audit`.
 - **Pendiente para Fase 06:** Validación manual integral de registro público con envío real de correo SMTP y clic en `/auth/callback` antes de cerrar producción.
+
+
+---
+
+## Fase 05 — Auditoría Técnica, Testing, Seguridad y Optimización (`PROMPT-005`, 2026-11-27)
+
+### Prompt y Enfoque Crítico
+- Registrado íntegramente en [`docs/prompts/005-testing-and-optimization.md`](./docs/prompts/005-testing-and-optimization.md).
+- Enfoque: auditoría adversarial del código existente para identificar y corregir únicamente defectos técnicos reales (sin rediseños ni abstracciones innecesarias), cubrir los 28 escenarios E2E, validar agregaciones >1,000 filas tanto unitariamente como en Supabase real, auditar accesibilidad, concurrencia, seguridad, historial Git, privacidad de evidencias y preparación para Vercel + Custom SMTP.
+
+### Hallazgos Reales Detectados y Corregidos (`docs/AUDIT.md`)
+1. **`AUDIT-001` (Alto — Estados de error engañosos):** Los 5 Server Components de `(app)` atrapaban errores con `.catch(() => emptyData)` mostrando balances en `$0.00` falsos ante caídas; y los Client Components mantenían KPIs previos visibles durante errores de carga. Corregido propagando `initialError` y renderizando `<ErrorAlert onRetry={...} />` en lugar de cifras en `$0.00` (`a58e0e2`).
+2. **`AUDIT-002` (Alto — Orden de autenticación en `/api/profile`):** `PATCH /api/profile` validaba Zod (`400`) antes de verificar `getUser()` (`401`). Corregido moviendo `requireAuthenticatedContext()` antes del parseo JSON (`c56dc6d`).
+3. **`AUDIT-003` (Alto — Sanitización PostgREST):** `sanitizePostgrestSearch` no eliminaba `"` sin cerrar ni el comodín `*` en `.or(...)`. Extraído a `src/lib/search.ts` y endurecido preservando acentos y Unicode (`c56dc6d`), validado en vivo contra Supabase.
+4. **`AUDIT-004` (Medio — Concurrencia y sesión expirada):** Agregada redirección limpia a `/login?next=...` ante HTTP `401`, bloqueo de cierre de modales durante `isSubmitting`, guarda contra doble envío y deduplicación por `id` en `collectPaginatedBatches` (`9e5c01e`, `a58e0e2`).
+5. **`AUDIT-005` (Medio — Consultas redundantes):** `React.cache()` por petición en `src/services/_auth.ts` eliminó llamadas duplicadas a `supabase.auth.getUser()` (reduciendo latencias de API en vivo de ~750–815 ms a **541–568 ms**); `listTransactions` evita doble consulta cuando página 1 contiene todos los resultados y `budgets.service.ts` usa `fetchExpenseTotalsByCategory` ligero (`9e5c01e`).
+6. **`AUDIT-006` (Medio — Accesibilidad WCAG 2.2 AA):** Añadidos `tabIndex={0}` + `role="region"` en `Table`, enlace `Saltar al contenido principal` en `(app)/layout.tsx`, `@media (prefers-reduced-motion: reduce)` en `globals.css`, `role="img"` + `aria-label` en gráficos Recharts y `aria-invalid`/`aria-describedby`/`role="alert"` en los formularios de Fase 04 (`1ffb9e5`, `a58e0e2`).
+7. **`AUDIT-007` (Medio — Portabilidad y `.gitignore`):** Reemplazadas rutas absolutas de Windows en `docs/IMPLEMENTATION_PLAN.md` y `docs/walkthroughs/003-database-and-authentication.md` y ampliado `.gitignore` para artefactos Playwright (`315f30a`).
+8. **`AUDIT-008` (Bajo — Consistencia visual del 100%):** `calculateExactBudgetPercentage` acota `< limit` a `99.9%` y `> limit` a `100.1%`, reservando `100.0%` exclusivamente a `limit_reached` (`f5e95a2`).
+9. **`AUDIT-009` (Bajo — Estrategia SMTP Fase 06):** Documentada en [`docs/DEPLOYMENT.md`](./docs/DEPLOYMENT.md) tras consultar restricciones vigentes de Supabase Auth (2 correos/hora, solo miembros del equipo en SMTP integrado) y opciones gratuitas (Brevo, Resend, Gmail App Password) + compatibilidad dual PKCE/`token_hash`.
+
+### Validaciones Ejecutadas y Commits de Fase 05
+- **Unitarias (`npm run test`):** `36/36` aprobadas (8 archivos, incluyendo `tests/batch-pagination.test.ts`).
+- **Volumen real >1,000 filas + cobertura 28/28 + a11y + resiliencia + perf (`npm run verify:phase05`):** **`24/24` aprobadas**, incluyendo inserción y agregación real de **1,005 filas** en Supabase (`100500` centavos, `1,006` líneas CSV, `0` remanentes tras limpieza) y métricas de laboratorio en producción (`FCP=152ms`, `LCP=152ms`, `CLS=0`, `TBT=0ms`, `0` fuentes externas).
+- **Instalación limpia reproducible:** `git clone` sin `.env.local` → `npm ci` (`621` paquetes, `0 vulnerabilities`) → `npm run build` (`EXIT=0`).
+- **Regresión completa de cierre:** `npm audit` (`0 vulnerabilities`), `test:supabase-rls` (`18/18`), `test:api-security` (`42/42`), `verify:phase04` (`18/18` + `63/63` responsive), `verify:phase03` (`15/15` + `21/21` responsive).
+- **Commits:** `f5e95a2`, `c56dc6d`, `9e5c01e`, `1ffb9e5`, `a58e0e2`, `315f30a`, `c675b63` (+ commit final de documentación de Fase 05).
