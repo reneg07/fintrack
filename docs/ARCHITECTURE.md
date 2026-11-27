@@ -62,6 +62,13 @@ flowchart TD
 - **Decisión:** Centralizar todos los datos ficticios de Fase 02 en `src/lib/demo-data.ts`, calculando dinámicamente totales, balances, series gráficas y porcentajes de presupuesto a partir de un único conjunto coherente de transacciones y presupuestos.
 - **Motivo:** Garantizar exactitud matemática en la demostración y facilitar la sustitución limpia por servicios de Supabase en las Fases 03 y 04.
 
+### ADR-007 — Tipografía Geist Autoalojada (`geist@1.9.2`)
+- **Decisión:** Sustituir la descarga remota de `next/font/google` por el paquete oficial autoalojado `geist` (`geist/font/sans` y `geist/font/mono`).
+- **Motivo:** Garantizar compilación determinista de `next build` en entornos sin salida externa a `fonts.googleapis.com` conservando la tipografía Geist oficial y números tabulares (`Geist Mono`).
+
+### ADR-008 — Contraste WCAG AA en Botones y Mensajes de Estado
+- **Decisión:** Mantener `#059669`, `#10251F`, `#34D399` y `#DC5656` como identidad visual base y ajustar `--primary` de botones a `#047857` (contraste 5.48:1 con texto blanco), `--danger-text` a `#B91C1C` y `--warning-text` a `#B45309` para garantizar accesibilidad WCAG AA en texto normal y pequeño.
+
 ## 4. Modelo de Datos y Contratos API (Planificados para Fases 03 y 04)
 
 El diseño completo del modelo entidad-relación (tablas `profiles`, `categories`, `transactions`, `budgets`, claves foráneas compuestas `(id, user_id, type)` y políticas RLS) y los 11 endpoints `/api/*` se encuentran especificados en [IMPLEMENTATION_PLAN.md](./IMPLEMENTATION_PLAN.md).
