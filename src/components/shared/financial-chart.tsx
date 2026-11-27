@@ -430,10 +430,10 @@ interface ExactExpenseCategoryChartProps {
 
 export function ExactExpenseCategoryChart({
   data,
-  height = 240,
+  height = 195,
 }: ExactExpenseCategoryChartProps) {
   return (
-    <div className="grid items-center gap-4 sm:grid-cols-[minmax(0,220px)_1fr]">
+    <div className="flex flex-col gap-4">
       <div style={{ height }} className="w-full min-w-0">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
@@ -443,8 +443,8 @@ export function ExactExpenseCategoryChart({
               nameKey="name"
               cx="50%"
               cy="50%"
-              innerRadius={56}
-              outerRadius={86}
+              innerRadius={50}
+              outerRadius={76}
               paddingAngle={2}
               stroke="#FFFFFF"
               strokeWidth={2}
@@ -474,7 +474,7 @@ export function ExactExpenseCategoryChart({
           </PieChart>
         </ResponsiveContainer>
       </div>
-      <ul className="space-y-2.5 text-sm">
+      <ul className="space-y-2 text-sm">
         {data.slice(0, 6).map((item) => (
           <li
             key={item.categoryId}
