@@ -262,7 +262,12 @@ export function ExactCashflowBarChart({
   height = 280,
 }: ExactCashflowBarChartProps) {
   return (
-    <div style={{ height }} className="w-full min-w-0">
+    <div
+      role="img"
+      aria-label={`Gráfico comparativo de ingresos y gastos mensuales (${data.length} meses)`}
+      style={{ height }}
+      className="w-full min-w-0"
+    >
       <ResponsiveContainer width="100%" height="100%">
         <BarChart
           data={data}
@@ -357,7 +362,12 @@ export function ExactNetFlowAreaChart({
   height = 260,
 }: ExactNetFlowAreaChartProps) {
   return (
-    <div style={{ height }} className="w-full min-w-0">
+    <div
+      role="img"
+      aria-label={`Gráfico de evolución del flujo neto mensual (${data.length} meses)`}
+      style={{ height }}
+      className="w-full min-w-0"
+    >
       <ResponsiveContainer width="100%" height="100%">
         <AreaChart
           data={data}
@@ -434,7 +444,12 @@ export function ExactExpenseCategoryChart({
 }: ExactExpenseCategoryChartProps) {
   return (
     <div className="flex flex-col gap-4">
-      <div style={{ height }} className="w-full min-w-0">
+      <div
+        role="img"
+        aria-label={`Gráfico de distribución de gastos por categoría (${data.length} categorías)`}
+        style={{ height }}
+        className="w-full min-w-0"
+      >
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie

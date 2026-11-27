@@ -7,7 +7,10 @@ function Table({ className, ...props }: React.ComponentProps<"table">) {
   return (
     <div
       data-slot="table-container"
-      className="relative w-full overflow-x-auto"
+      role="region"
+      aria-label="Tabla de datos financieros"
+      tabIndex={0}
+      className="table-scroll-region relative w-full overflow-x-auto"
     >
       <table
         data-slot="table"
