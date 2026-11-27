@@ -5,29 +5,32 @@ import {
   formatZodFieldErrors,
   transactionTypeSchema,
 } from "@/schemas/common.schema";
+import { requireAuthenticatedContext } from "@/services/_auth";
 import {
   createCategory,
   listCategoriesWithUsage,
 } from "@/services/categories.service";
 
 export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const rawType = searchParams.get("type");
-
-  let typeFilter: "income" | "expense" | undefined;
-  if (rawType !== null && rawType !== "" && rawType !== "all") {
-    const parsedType = transactionTypeSchema.safeParse(rawType);
-    if (!parsedType.success) {
-      return apiError(
-        "El parámetro 'type' debe ser 'income' o 'expense'.",
-        400,
-        "VALIDATION_ERROR",
-      );
-    }
-    typeFilter = parsedType.data;
-  }
-
   try {
+    await requireAuthenticatedContext();
+
+    const { searchParams } = new URL(request.url);
+    const rawType = searchParams.get("type");
+
+    let typeFilter: "income" | "expense" | undefined;
+    if (rawType !== null && rawType !== "" && rawType !== "all") {
+      const parsedType = transactionTypeSchema.safeParse(rawType);
+      if (!parsedType.success) {
+        return apiError(
+          "El parámetro 'type' debe ser 'income' o 'expense'.",
+          400,
+          "VALIDATION_ERROR",
+        );
+      }
+      typeFilter = parsedType.data;
+    }
+
     const categories = await listCategoriesWithUsage({ type: typeFilter });
     return apiSuccess(categories, 200, { count: categories.length });
   } catch (error) {
@@ -40,24 +43,26 @@ export async function POST(request: Request) {
     return apiError("Origen de solicitud no permitido.", 403, "FORBIDDEN_ORIGIN");
   }
 
-  let body: unknown;
   try {
-    body = await request.json();
-  } catch {
-    return apiError("Cuerpo JSON inválido.", 400, "INVALID_JSON");
-  }
+    await requireAuthenticatedContext();
 
-  const parsed = createCategorySchema.safeParse(body);
-  if (!parsed.success) {
-    return apiError(
-      "Los datos de la categoría no son válidos.",
-      400,
-      "VALIDATION_ERROR",
-      formatZodFieldErrors(parsed.error.issues),
-    );
-  }
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return apiError("Cuerpo JSON inválido.", 400, "INVALID_JSON");
+    }
 
-  try {
+    const parsed = createCategorySchema.safeParse(body);
+    if (!parsed.success) {
+      return apiError(
+        "Los datos de la categoría no son válidos.",
+        400,
+        "VALIDATION_ERROR",
+        formatZodFieldErrors(parsed.error.issues),
+      );
+    }
+
     const created = await createCategory(parsed.data);
     return apiSuccess(created, 201);
   } catch (error) {
