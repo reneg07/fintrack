@@ -1,39 +1,42 @@
 import type { Metadata } from "next";
-import Link from "next/link";
-import { Target } from "lucide-react";
-import { buttonVariants } from "@/components/ui/button";
-import { EmptyState } from "@/components/shared/empty-state";
-import { PageHeader } from "@/components/shared/page-header";
+import { BudgetsManager } from "@/components/budgets/budgets-manager";
 import { formatMonthLabel, getCurrentMonthKey } from "@/lib/dates";
+import { listBudgetsForMonth } from "@/services/budgets.service";
+import { listCategoriesWithUsage } from "@/services/categories.service";
+import type { BudgetsMonthPayload } from "@/types/domain";
 
 export const metadata: Metadata = {
   title: "Presupuestos",
   description: "Control mensual de presupuestos por categoría en FinTrack.",
 };
 
-export default function BudgetsPage() {
-  const monthLabel = formatMonthLabel(getCurrentMonthKey());
+export default async function BudgetsPage() {
+  const currentMonth = getCurrentMonthKey();
+  const emptyPayload: BudgetsMonthPayload = {
+    month: currentMonth,
+    monthLabel: formatMonthLabel(currentMonth),
+    items: [],
+    summary: {
+      totalLimitCents: "0",
+      totalSpentCents: "0",
+      totalRemainingCents: "0",
+      globalPercentage: 0,
+      healthyCount: 0,
+      warningCount: 0,
+      limitReachedCount: 0,
+      exceededCount: 0,
+    },
+  };
+
+  const [initialData, expenseCategories] = await Promise.all([
+    listBudgetsForMonth(currentMonth).catch(() => emptyPayload),
+    listCategoriesWithUsage({ type: "expense" }).catch(() => []),
+  ]);
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Presupuestos"
-        description={`Límites mensuales por categoría de gasto para ${monthLabel.toLowerCase()}.`}
-      />
-
-      <EmptyState
-        icon={Target}
-        title="Aún no tienes presupuestos configurados"
-        description="Los presupuestos mensuales se asociarán exclusivamente a tus categorías de gastos y calcularán el avance real de forma automática en la Fase 04."
-        action={
-          <Link
-            href="/categories"
-            className={buttonVariants({ variant: "outline" })}
-          >
-            Explorar categorías de gasto
-          </Link>
-        }
-      />
-    </div>
+    <BudgetsManager
+      initialData={initialData}
+      expenseCategories={expenseCategories}
+    />
   );
 }
