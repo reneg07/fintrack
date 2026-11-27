@@ -108,16 +108,16 @@ export default function LandingPage() {
       {/* Hero Section */}
       <section className="border-b border-border/80 bg-card">
         <div className="mx-auto grid max-w-6xl items-center gap-12 px-4 py-14 sm:px-6 lg:grid-cols-[1.05fr_0.95fr] lg:py-20">
-          <div className="space-y-6">
+          <div className="min-w-0 space-y-6">
             <Badge
               variant="outline"
-              className="gap-1.5 border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-medium text-success-text"
+              className="h-auto max-w-full whitespace-normal gap-1.5 border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-medium text-success-text"
             >
               <span
                 aria-hidden="true"
-                className="size-1.5 rounded-full bg-brand-primary"
+                className="size-1.5 shrink-0 rounded-full bg-brand-primary"
               />
-              Finanzas personales en USD · Claridad mensual
+              Finanzas personales en USD · Control mensual
             </Badge>
 
             <h1 className="text-4xl font-semibold tracking-tight text-brand-dark sm:text-5xl lg:leading-[1.1]">
@@ -179,7 +179,7 @@ export default function LandingPage() {
           </div>
 
           {/* Custom Dashboard Preview built from real coherent demo data */}
-          <div className="rounded-2xl border border-border bg-background p-4 sm:p-5">
+          <div className="min-w-0 rounded-2xl border border-border bg-background p-4 sm:p-5">
             <div className="flex items-center justify-between gap-3 border-b border-border pb-3.5">
               <div>
                 <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">

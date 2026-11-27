@@ -14,7 +14,6 @@ import {
   CardDescription,
   CardFooter,
   CardHeader,
-  CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -50,9 +49,9 @@ export function LoginForm() {
   return (
     <Card className="border-border/90 bg-card shadow-none">
       <CardHeader className="space-y-1.5 pb-4">
-        <CardTitle className="text-2xl font-semibold tracking-tight">
+        <h1 className="font-heading text-2xl leading-snug font-semibold tracking-tight">
           Iniciar sesión
-        </CardTitle>
+        </h1>
         <CardDescription>
           Ingresa con tu correo electrónico y contraseña para acceder a tu panel
           financiero.

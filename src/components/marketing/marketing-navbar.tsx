@@ -38,7 +38,7 @@ export function MarketingNavbar() {
 
         <nav
           aria-label="Navegación principal"
-          className="hidden items-center gap-1 md:flex"
+          className="hidden items-center gap-1 lg:flex"
         >
           {NAV_LINKS.map((item) => (
             <Link
@@ -51,7 +51,7 @@ export function MarketingNavbar() {
           ))}
         </nav>
 
-        <div className="hidden items-center gap-2.5 md:flex">
+        <div className="hidden items-center gap-2.5 lg:flex">
           <Link
             href="/login"
             className={cn(buttonVariants({ variant: "ghost", size: "default" }), "h-9 px-3.5")}
@@ -66,7 +66,7 @@ export function MarketingNavbar() {
           </Link>
         </div>
 
-        <div className="md:hidden">
+        <div className="lg:hidden">
           <Sheet open={open} onOpenChange={setOpen}>
             <SheetTrigger
               render={

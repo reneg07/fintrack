@@ -183,6 +183,7 @@ export function ExpenseCategoryChart({
               paddingAngle={2}
               stroke="#FFFFFF"
               strokeWidth={2}
+              isAnimationActive={false}
             >
               {data.map((entry) => (
                 <Cell key={entry.categoryId} fill={entry.color} />
