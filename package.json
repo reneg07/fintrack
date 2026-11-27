@@ -11,7 +11,9 @@
     "test": "vitest run",
     "verify:phase02": "node scripts/run-with-server.mjs scripts/verify-phase-02.mjs",
     "verify:phase03": "node scripts/run-with-server.mjs scripts/verify-phase-03.mjs",
-    "test:supabase-rls": "node scripts/test-supabase-rls.mjs"
+    "verify:phase04": "node scripts/run-with-server.mjs scripts/verify-phase-04.mjs",
+    "test:supabase-rls": "node scripts/test-supabase-rls.mjs",
+    "test:api-security": "node scripts/run-with-server.mjs scripts/test-api-security.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",
