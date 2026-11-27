@@ -1,6 +1,11 @@
 import "server-only";
 
 import {
+  collectPaginatedBatches,
+  DEFAULT_POSTGREST_BATCH_SIZE,
+} from "@/lib/batch-pagination";
+import { sanitizePostgrestSearch } from "@/lib/search";
+import {
   parseExactCents,
   serializeExactCents,
 } from "@/lib/money";
@@ -28,7 +33,7 @@ import type {
 } from "@/types/domain";
 
 const ZERO = BigInt(0);
-const BATCH_SIZE = 1000;
+const BATCH_SIZE = DEFAULT_POSTGREST_BATCH_SIZE;
 
 export interface TransactionFilterOptions {
   q?: string;
@@ -38,20 +43,7 @@ export interface TransactionFilterOptions {
   to?: string;
 }
 
-/**
- * Escapes user search input so it is safe inside PostgREST `.or(...ilike...)` filters
- * without wildcard injection or filter-syntax injection.
- */
-export function sanitizePostgrestSearch(raw: string): string {
-  return raw
-    .trim()
-    .replace(/\\/g, "\\\\")
-    .replace(/%/g, "\\%")
-    .replace(/_/g, "\\_")
-    .replace(/[(),]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
+export { sanitizePostgrestSearch };
 
 function mapCategoryMap(rows: CategoryRow[]): Map<string, Category> {
   const map = new Map<string, Category>();
@@ -144,8 +136,8 @@ export async function fetchCategoryMap(
 
 /**
  * Fetches ALL matching user transactions across arbitrary result sizes by paginating
- * in 1000-row batches with deterministic ordering. Prevents silent truncation on
- * dashboard aggregations, budgets, reports, and CSV exports.
+ * in 1000-row batches with deterministic ordering and ID deduplication.
+ * Prevents silent truncation on dashboard aggregations, budgets, reports, and CSV exports.
  */
 export async function fetchAllUserTransactions(
   supabase: AuthenticatedSupabaseClient,
@@ -154,40 +146,31 @@ export async function fetchAllUserTransactions(
   transactions: TransactionWithCategory[];
   categoryMap: Map<string, Category>;
 }> {
-  const categoryMap = await fetchCategoryMap(supabase);
-  const rows: TransactionRow[] = [];
-  let offset = 0;
+  const [categoryMap, rows] = await Promise.all([
+    fetchCategoryMap(supabase),
+    collectPaginatedBatches<TransactionRow>(async (from, to) => {
+      let query = supabase
+        .from("transactions")
+        .select("*")
+        .order("occurred_on", { ascending: false })
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: false })
+        .range(from, to);
 
-  while (true) {
-    let query = supabase
-      .from("transactions")
-      .select("*")
-      .order("occurred_on", { ascending: false })
-      .order("created_at", { ascending: false })
-      .order("id", { ascending: false })
-      .range(offset, offset + BATCH_SIZE - 1);
+      query = applyTransactionFilters(query, filters);
 
-    query = applyTransactionFilters(query, filters);
+      const { data, error } = await query;
+      if (error) {
+        throw new ServiceError(
+          "No fue posible consultar tus transacciones.",
+          500,
+          "TRANSACTIONS_FETCH_FAILED",
+        );
+      }
 
-    const { data, error } = await query;
-    if (error) {
-      throw new ServiceError(
-        "No fue posible consultar tus transacciones.",
-        500,
-        "TRANSACTIONS_FETCH_FAILED",
-      );
-    }
-
-    if (!data || data.length === 0) {
-      break;
-    }
-
-    rows.push(...data);
-    if (data.length < BATCH_SIZE) {
-      break;
-    }
-    offset += BATCH_SIZE;
-  }
+      return data ?? [];
+    }, BATCH_SIZE),
+  ]);
 
   return {
     transactions: rows.map((row) => mapTransactionRow(row, categoryMap)),
@@ -196,8 +179,82 @@ export async function fetchAllUserTransactions(
 }
 
 /**
+ * Lightweight paginated fetcher strictly for expense totals per category (selects only
+ * `id, category_id, amount_cents` without transferring descriptions/notes/timestamps).
+ */
+export async function fetchExpenseTotalsByCategory(
+  supabase: AuthenticatedSupabaseClient,
+  filters: { from: string; to: string; categoryId?: string },
+): Promise<Map<string, bigint>> {
+  const rows = await collectPaginatedBatches<{
+    id: string;
+    category_id: string;
+    amount_cents: number;
+  }>(async (from, to) => {
+    let query = supabase
+      .from("transactions")
+      .select("id, category_id, amount_cents")
+      .eq("type", "expense")
+      .gte("occurred_on", filters.from)
+      .lte("occurred_on", filters.to)
+      .order("id", { ascending: true })
+      .range(from, to);
+
+    if (filters.categoryId) {
+      query = query.eq("category_id", filters.categoryId);
+    }
+
+    const { data, error } = await query;
+    if (error) {
+      throw new ServiceError(
+        "No fue posible calcular los gastos del período para tus presupuestos.",
+        500,
+        "BUDGET_EXPENSE_QUERY_FAILED",
+      );
+    }
+
+    return data ?? [];
+  }, BATCH_SIZE);
+
+  const totals = new Map<string, bigint>();
+  for (const row of rows) {
+    const prev = totals.get(row.category_id) ?? ZERO;
+    totals.set(row.category_id, prev + parseExactCents(row.amount_cents));
+  }
+  return totals;
+}
+
+function summarizeRowsToExactTotals(
+  rows: readonly { type: TransactionType; amount_cents: number }[],
+): {
+  incomeCents: string;
+  expenseCents: string;
+  netCents: string;
+  count: number;
+} {
+  let income = ZERO;
+  let expense = ZERO;
+
+  for (const row of rows) {
+    const amount = parseExactCents(row.amount_cents);
+    if (row.type === "income") {
+      income += amount;
+    } else {
+      expense += amount;
+    }
+  }
+
+  return {
+    incomeCents: serializeExactCents(income),
+    expenseCents: serializeExactCents(expense),
+    netCents: serializeExactCents(income - expense),
+    count: rows.length,
+  };
+}
+
+/**
  * Computes exact arbitrary-precision BigInt totals over ALL matching transactions
- * (never truncated to the current UI page or 1000-row cap).
+ * (never truncated to the current UI page or 1000-row cap, deduplicated by id).
  */
 async function computeFilteredExactTotals(
   supabase: AuthenticatedSupabaseClient,
@@ -208,17 +265,16 @@ async function computeFilteredExactTotals(
   netCents: string;
   count: number;
 }> {
-  let income = ZERO;
-  let expense = ZERO;
-  let count = 0;
-  let offset = 0;
-
-  while (true) {
+  const rows = await collectPaginatedBatches<{
+    id: string;
+    type: TransactionType;
+    amount_cents: number;
+  }>(async (from, to) => {
     let query = supabase
       .from("transactions")
-      .select("type, amount_cents")
+      .select("id, type, amount_cents")
       .order("id", { ascending: true })
-      .range(offset, offset + BATCH_SIZE - 1);
+      .range(from, to);
 
     query = applyTransactionFilters(query, filters);
 
@@ -231,32 +287,10 @@ async function computeFilteredExactTotals(
       );
     }
 
-    if (!data || data.length === 0) {
-      break;
-    }
+    return data ?? [];
+  }, BATCH_SIZE);
 
-    for (const row of data) {
-      const amount = parseExactCents(row.amount_cents);
-      if (row.type === "income") {
-        income += amount;
-      } else {
-        expense += amount;
-      }
-      count += 1;
-    }
-
-    if (data.length < BATCH_SIZE) {
-      break;
-    }
-    offset += BATCH_SIZE;
-  }
-
-  return {
-    incomeCents: serializeExactCents(income),
-    expenseCents: serializeExactCents(expense),
-    netCents: serializeExactCents(income - expense),
-    count,
-  };
+  return summarizeRowsToExactTotals(rows);
 }
 
 export async function listTransactions(
@@ -287,10 +321,9 @@ export async function listTransactions(
 
   pageQuery = applyTransactionFilters(pageQuery, filters);
 
-  const [pageResult, categoryMap, totals] = await Promise.all([
+  const [pageResult, categoryMap] = await Promise.all([
     pageQuery,
     fetchCategoryMap(supabase),
-    computeFilteredExactTotals(supabase, filters),
   ]);
 
   if (pageResult.error) {
@@ -301,11 +334,18 @@ export async function listTransactions(
     );
   }
 
+  const pageRows = pageResult.data ?? [];
+  const exactCount = pageResult.count ?? pageRows.length;
+
+  // Optimization: when page 1 already contains all matching rows, avoid an extra full-scan query
+  const totals =
+    page === 1 && exactCount <= pageSize
+      ? summarizeRowsToExactTotals(pageRows)
+      : await computeFilteredExactTotals(supabase, filters);
+
   const totalCount = pageResult.count ?? totals.count;
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
-  const items = (pageResult.data ?? []).map((row) =>
-    mapTransactionRow(row, categoryMap),
-  );
+  const items = pageRows.map((row) => mapTransactionRow(row, categoryMap));
 
   return {
     items,

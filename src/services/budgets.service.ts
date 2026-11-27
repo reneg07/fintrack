@@ -27,8 +27,8 @@ import {
 } from "@/services/_auth";
 import { toCategoryIconKey } from "@/services/categories.service";
 import {
-  fetchAllUserTransactions,
   fetchCategoryMap,
+  fetchExpenseTotalsByCategory,
 } from "@/services/transactions.service";
 import type { BudgetRow } from "@/types/database";
 import type {
@@ -58,18 +58,12 @@ async function computeExpenseSpentForCategoryInMonth(
   monthKey: string,
 ): Promise<bigint> {
   const { start, endInclusive } = getMonthRangeExclusiveEnd(monthKey);
-  const { transactions } = await fetchAllUserTransactions(supabase, {
-    type: "expense",
+  const totals = await fetchExpenseTotalsByCategory(supabase, {
     categoryId,
     from: start,
     to: endInclusive,
   });
-
-  let total = ZERO;
-  for (const tx of transactions) {
-    total += parseExactCents(tx.amountCents);
-  }
-  return total;
+  return totals.get(categoryId) ?? ZERO;
 }
 
 function buildBudgetSummary(
@@ -109,14 +103,14 @@ export async function listBudgetsForMonth(
   const monthDate = `${monthKey}-01`;
   const { start, endInclusive } = getMonthRangeExclusiveEnd(monthKey);
 
-  const [budgetsResult, txBundle] = await Promise.all([
+  const [budgetsResult, categoryMap, spentByCategory] = await Promise.all([
     supabase
       .from("budgets")
       .select("*")
       .eq("month", monthDate)
       .order("created_at", { ascending: true }),
-    fetchAllUserTransactions(supabase, {
-      type: "expense",
+    fetchCategoryMap(supabase),
+    fetchExpenseTotalsByCategory(supabase, {
       from: start,
       to: endInclusive,
     }),
@@ -130,12 +124,6 @@ export async function listBudgetsForMonth(
     );
   }
 
-  const spentByCategory = new Map<string, bigint>();
-  for (const tx of txBundle.transactions) {
-    const prev = spentByCategory.get(tx.categoryId) ?? ZERO;
-    spentByCategory.set(tx.categoryId, prev + parseExactCents(tx.amountCents));
-  }
-
   let totalLimit = ZERO;
   let totalSpent = ZERO;
   let healthyCount = 0;
@@ -144,7 +132,7 @@ export async function listBudgetsForMonth(
   let exceededCount = 0;
 
   const items: ExactBudgetSummary[] = (budgetsResult.data ?? []).map((row) => {
-    const category = txBundle.categoryMap.get(row.category_id) ?? {
+    const category = categoryMap.get(row.category_id) ?? {
       ...FALLBACK_EXPENSE_CATEGORY,
       id: row.category_id,
     };

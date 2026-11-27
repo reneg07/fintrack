@@ -1,5 +1,6 @@
 import "server-only";
 
+import { collectPaginatedBatches } from "@/lib/batch-pagination";
 import { CATEGORY_ICON_MAP } from "@/lib/category-icons";
 import {
   ConflictError,
@@ -45,44 +46,37 @@ function mapCategoryRow(row: CategoryRow): Category {
 
 /**
  * Paginates through all rows of a user's table to count usage per category
- * without ever hitting PostgREST's default 1000-row cap.
+ * without ever hitting PostgREST's default 1000-row cap or double-counting under concurrent writes.
  */
 async function countUsageByCategory(
   supabase: AuthenticatedSupabaseClient,
   table: "transactions" | "budgets",
 ): Promise<Map<string, number>> {
+  const rows = await collectPaginatedBatches<{ id: string; category_id: string }>(
+    async (from, to) => {
+      const { data, error } = await supabase
+        .from(table)
+        .select("id, category_id")
+        .order("id", { ascending: true })
+        .range(from, to);
+
+      if (error) {
+        throw new ServiceError(
+          "No fue posible verificar los registros asociados a tus categorías.",
+          500,
+          "CATEGORY_USAGE_QUERY_FAILED",
+        );
+      }
+
+      return data ?? [];
+    },
+    PAGE_BATCH_SIZE,
+  );
+
   const counts = new Map<string, number>();
-  let offset = 0;
-
-  while (true) {
-    const { data, error } = await supabase
-      .from(table)
-      .select("category_id")
-      .order("id", { ascending: true })
-      .range(offset, offset + PAGE_BATCH_SIZE - 1);
-
-    if (error) {
-      throw new ServiceError(
-        "No fue posible verificar los registros asociados a tus categorías.",
-        500,
-        "CATEGORY_USAGE_QUERY_FAILED",
-      );
-    }
-
-    if (!data || data.length === 0) {
-      break;
-    }
-
-    for (const row of data) {
-      counts.set(row.category_id, (counts.get(row.category_id) ?? 0) + 1);
-    }
-
-    if (data.length < PAGE_BATCH_SIZE) {
-      break;
-    }
-    offset += PAGE_BATCH_SIZE;
+  for (const row of rows) {
+    counts.set(row.category_id, (counts.get(row.category_id) ?? 0) + 1);
   }
-
   return counts;
 }
 
