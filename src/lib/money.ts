@@ -76,7 +76,7 @@ export function dollarsToCents(input: string | number): number {
   }
 
   const paddedFraction = fracPart.padEnd(2, "0");
-  const centsBigInt = BigInt(wholePart) * 100n + BigInt(paddedFraction);
+  const centsBigInt = BigInt(wholePart) * BigInt(100) + BigInt(paddedFraction);
 
   if (centsBigInt > BigInt(MAX_SAFE_CENTS)) {
     throw new RangeError(
@@ -134,7 +134,7 @@ export function formatCurrency(
  * Sums an array of integer cent values safely with overflow protection.
  */
 export function sumCents(values: readonly number[]): number {
-  let total = 0n;
+  let total = BigInt(0);
   for (const value of values) {
     assertSafeIntegerCents(value);
     total += BigInt(value);
