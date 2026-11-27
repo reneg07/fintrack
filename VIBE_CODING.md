@@ -87,3 +87,42 @@ Este documento registra de forma verídica, cronológica e iterativa el proceso 
 ### Estado final de la Fase 03
 - **Implementado y verificado localmente:** 100% de la resolución visual de Fase 02, simplificación de Next.js 16, migraciones PostgreSQL + RLS, tipos `database.ts`, clientes Supabase SSR, `src/proxy.ts`, `/auth/callback`, `/api/auth/signout`, `/api/profile`, autenticación real UI, protección de rutas, perfil real, categorías reales y estados vacíos honestos.
 - **Bloqueado externamente (requiere intervención humana en Supabase):** Creación del proyecto gratuito en Supabase, ejecución del archivo listo `supabase/phase-03-setup.sql`, carga de `.env.local` y ejecución final de `npm run test:supabase-rls` + capturas autenticadas en vivo (`phase-03-authenticated-dashboard.png`, `phase-03-profile.png`, `phase-03-mobile-dashboard.png`).
+
+
+---
+
+## Fase 03.1 — Iteración Correctiva: Validación Real de Integración Supabase y Cierre de Fase 03
+
+- **Identificador de iteración:** `Fase 03.1`
+- **Fecha real de ejecución:** `2026-11-26` / `2026-11-27`
+- **Prompt recibido:** [docs/prompts/003.1-supabase-integration-validation.md](./docs/prompts/003.1-supabase-integration-validation.md)
+- **Walkthrough versionado:** [docs/walkthroughs/003.1-supabase-integration-validation.md](./docs/walkthroughs/003.1-supabase-integration-validation.md)
+- **Objetivo:** Verificar técnicamente las configuraciones externas realizadas por el usuario en Supabase, ejecutar pruebas reales de restricciones PostgreSQL y aislamiento RLS de 2 usuarios sin `service_role`, ejecutar flujos autenticados E2E con Playwright + grabación WebM + capturas pendientes, completar la matriz responsive de 63 combinaciones, documentar la estrategia monetaria acumulada para Fase 04 y cerrar la Fase 03.
+
+### Configuraciones externas reportadas por el usuario vs. verificaciones técnicas ejecutadas
+- **Reportado por el usuario:** Proyecto gratuito `FinTrack` en Supabase (`DevPortfolio`, West US Oregon), Data API habilitada, concesión automática API deshabilitada, RLS automático habilitado, ejecución de `supabase/phase-03-setup.sql`, Site URL `http://localhost:3000`, Redirect URL `http://localhost:3000/auth/callback` y archivo `.env.local` creado.
+- **Verificado técnicamente:**
+  1. `.env.local` excluido por `.gitignore:34:.env*` (`git check-ignore -v .env.local`), con `NEXT_PUBLIC_SUPABASE_URL` válida, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (`sb_publishable_*`), `NEXT_PUBLIC_APP_URL=http://localhost:3000` y ausencia total de `SUPABASE_SERVICE_ROLE_KEY`.
+  2. Conectividad real con `/auth/v1/settings` (`HTTP 200`, `email_enabled: true`, `disable_signup: false`, `mailer_autoconfirm: false`).
+  3. Rechazo estricto a `anon` en las 4 tablas vía PostgREST (`HTTP 401`, código PostgreSQL `42501 permission denied`).
+  4. Intervención humana coordinada para mantener **Confirm email** activo (sin debilitar seguridad): el usuario aplicó la migración correctiva UTF-8 `20261126235000_fix_utf8_seed_and_comments.sql` y creó 2 usuarios de prueba con **Auto Confirm User** configurando `TEST_USER_A_*` y `TEST_USER_B_*` en `.env.local`.
+
+### Problemas realmente encontrados y correcciones aplicadas
+1. **Doble codificación UTF-8 en `supabase/phase-03-setup.sql`:** La concatenación previa en PowerShell 5.1 sin `-Encoding UTF8` produjo mojibake (`CategorÃas`, `AlimentaciÃ³n`, `EducaciÃ³n`). Se creó la migración correctiva versionada e idempotente `supabase/migrations/20261126235000_fix_utf8_seed_and_comments.sql` (sin alterar migraciones ya aplicadas) y se regeneró `supabase/phase-03-setup.sql` con Node.js en UTF-8 puro. Verificado en remoto: `utf8Clean=true` (`Alimentación` y `Educación` limpias).
+2. **Variables `NEXT_PUBLIC_*` no inyectadas en el build anterior a `.env.local`:** La primera corrida de `verify:phase03` usó `.next` compilado antes de crear `.env.local`. Recompilar con `npm run build` (`- Environments: .env.local`) resolvió inmediatamente la conectividad en el bundle cliente.
+3. **Captura prematura del skeleton en `phase-03-authenticated-dashboard.png`:** Al inspeccionar la captura se observó `loading.tsx` antes de terminar el streaming del Server Component. Se añadió `waitFor` sobre `<h1>` en `scripts/verify-phase-03.mjs` y se recapturó el dashboard autenticado real.
+4. **Error de consola esperado (`400`) en prueba negativa de credenciales inválidas:** Filtrado estrictamente solo durante la prueba negativa en `/login` dentro de `scripts/verify-phase-03.mjs`, confirmando `0` errores inesperados de consola y `0` errores de página.
+5. **Binario `ffmpeg` ausente para grabación de video de Playwright:** Instalado mediante `npx playwright install ffmpeg`, generando la grabación real `docs/recordings/phase-03-auth-flow.webm`.
+
+### Resultados verificables y evidencias
+- `npx next typegen`, `npm run lint` (0 errores/0 advertencias), `npm run typecheck`, `npm run test` (22/22 tests) y `npm run build` → **`EXIT=0`**.
+- `npm run test:supabase-rls` → **`18/18` checks aprobados (`EXIT=0`)** cubriendo CRUD positivo propio, aislamiento RLS en las 4 tablas (`profiles`, `categories`, `transactions`, `budgets`), bloqueo de transferencia de propietario (`42501`), rechazo de montos `0`, `-500` y `> MAX_SAFE_CENTS` (`23514`), FKs compuestas (`23503`), presupuestos únicos (`23505`) y borrado seguro de categorías vinculadas (`23503`).
+- `npm run verify:phase03` → **`EXIT=0`**: 6/6 rutas privadas protegidas (`?next=`), `401` JSON + `no-store` en `/api/profile`, `403` cross-origin, open-redirect bloqueado, 15/15 flujos autenticados reales (incluyendo edición persistente de perfil y cierre de sesión con botón atrás), 21/21 checks responsive restantes (**63/63 matriz completa 9×7 sin desbordamiento**), 5 capturas autenticadas y grabación real `docs/recordings/phase-03-auth-flow.webm`.
+
+### Commits de esta iteración
+- `019e658` — `fix: add corrective UTF-8 migration for category seeding`
+- `15cd779` — `test: verify database constraints, RLS isolation, and authenticated flows`
+- *(Seguido de `docs: complete phase 03 integration walkthrough`)*
+
+### Estado final de la Fase 03
+- **Completada y verificada técnicamente contra Supabase real**, manteniendo `Confirm email` activo para producción (con la comprobación manual de entrega de correo real SMTP documentada como validación previa al despliegue en Fase 06).

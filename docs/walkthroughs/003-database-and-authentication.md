@@ -2,6 +2,7 @@
 
 > **Proyecto:** FinTrack (*Tus finanzas, bajo control*)  
 > **Fase:** Fase 03 (incluyendo resolución completa de pendientes visuales de Fase 02)  
+> **Actualización (2026-11-27):** La verificación real contra Supabase, las 18 pruebas RLS de 2 usuarios, las capturas autenticadas y la grabación WebM fueron completadas en [003.1-supabase-integration-validation.md](./003.1-supabase-integration-validation.md).  
 > **Fecha:** 2026-11-26  
 > **Prompts relacionados:** [001-master-planning.md](../prompts/001-master-planning.md) · [002-initialization-and-design.md](../prompts/002-initialization-and-design.md) · [003-database-and-authentication.md](../prompts/003-database-and-authentication.md)
 

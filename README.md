@@ -2,7 +2,7 @@
 
 Aplicación web SaaS de gestión de finanzas personales construida con **Next.js 16 (App Router)**, **React 19**, **TypeScript estricto**, **Tailwind CSS v4**, **shadcn/ui**, **Recharts** y **Supabase**, desarrollada mediante la metodología **Vibe Coding** (desarrollo iterativo guiado por IA).
 
-> **Estado actual:** **Fase 02 verificada al 100%** (incluyendo auditoría Playwright en 7 resoluciones y 11 capturas reales) y **Fase 03 implementada y verificada localmente** (migraciones PostgreSQL + RLS, tipos `database.ts`, Supabase SSR con `src/proxy.ts`, autenticación real `/login`, `/register`, `/auth/callback`, protección de rutas, `/api/profile` y `/api/auth/signout`). Pendiente únicamente configurar el proyecto gratuito de Supabase en `.env.local` y aplicar `supabase/phase-03-setup.sql` para ejecutar las pruebas en vivo de RLS de 2 usuarios (`npm run test:supabase-rls`).
+> **Estado actual:** **Fase 02 y Fase 03 completadas y verificadas** contra Supabase real (conectividad, migraciones PostgreSQL + migración correctiva UTF-8, 18/18 pruebas reales de restricciones y aislamiento RLS con 2 usuarios independientes sin `service_role`, flujos autenticados E2E en Playwright con grabación WebM, 63/63 matriz responsive sin desbordamiento y 22/22 pruebas unitarias Vitest). Listo para autorización de **Fase 04** (CRUD financiero completo y reportes CSV).
 
 ---
 
@@ -65,7 +65,8 @@ Aplicación web SaaS de gestión de finanzas personales construida con **Next.js
 - [VIBE_CODING.md](./VIBE_CODING.md) — Bitácora real e iterativa del desarrollo guiado por IA.
 - [AGENTS.md](./AGENTS.md) — Instrucciones permanentes y reglas de ingeniería.
 - [docs/walkthroughs/002-initialization-and-design.md](./docs/walkthroughs/002-initialization-and-design.md) — Walkthrough de Fase 02.
-- [docs/walkthroughs/003-database-and-authentication.md](./docs/walkthroughs/003-database-and-authentication.md) — Walkthrough de Fase 03.
+- [docs/walkthroughs/003-database-and-authentication.md](./docs/walkthroughs/003-database-and-authentication.md) — Walkthrough de implementación de Fase 03.
+- [docs/walkthroughs/003.1-supabase-integration-validation.md](./docs/walkthroughs/003.1-supabase-integration-validation.md) — Walkthrough definitivo de validación real Supabase y cierre de Fase 03.
 - [docs/IMPLEMENTATION_PLAN.md](./docs/IMPLEMENTATION_PLAN.md) — Plan maestro aprobado y adendas.
 - [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) — Arquitectura, diagramas Mermaid y ADRs.
 - [docs/TESTING.md](./docs/TESTING.md) — Estrategia y resultados reales de pruebas.
