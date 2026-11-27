@@ -12,6 +12,7 @@ Este directorio conserva de forma cronológica e íntegra cada prompt principal 
 | `003.1` | [003.1-supabase-integration-validation.md](./003.1-supabase-integration-validation.md) | Fase 03 (Iteración) | 2026-11-26 | Validación real de conectividad Supabase, permisos PostgreSQL, restricciones, RLS de dos usuarios, flujos autenticados Playwright y cierre de Fase 03 |
 | `004` | [004-functional-modules.md](./004-functional-modules.md) | Fase 04 | 2026-11-27 | Implementación completa de módulos funcionales (categorías, transacciones, presupuestos, dashboard, reportes, CSV, ADR-011 y E2E Playwright) |
 | `005` | [005-testing-and-optimization.md](./005-testing-and-optimization.md) | Fase 05 | 2026-11-27 | Auditoría técnica integral, cobertura de 28 escenarios, agregaciones >1,000 filas, seguridad API/RLS, accesibilidad, rendimiento y preparación de despliegue |
+| `006` | [006-deployment-and-delivery.md](./006-deployment-and-delivery.md) | Fase 06 | 2026-11-27 | Publicación en GitHub, despliegue en Vercel, validación de producción, estrategia SMTP y cierre académico definitivo |
 
 ## Política de Integridad
 - Cada prompt se registra textualmente sin alterar ni fabricar contenido.

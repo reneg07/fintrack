@@ -2,6 +2,9 @@
   "name": "fintrack",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=22.0.0"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -13,6 +16,7 @@
     "verify:phase03": "node scripts/run-with-server.mjs scripts/verify-phase-03.mjs",
     "verify:phase04": "node scripts/run-with-server.mjs scripts/verify-phase-04.mjs",
     "verify:phase05": "node scripts/run-with-server.mjs scripts/verify-phase-05.mjs",
+    "verify:prod": "node scripts/verify-production.mjs",
     "test:supabase-rls": "node scripts/test-supabase-rls.mjs",
     "test:api-security": "node scripts/run-with-server.mjs scripts/test-api-security.mjs"
   },
