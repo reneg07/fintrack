@@ -52,9 +52,10 @@ Este archivo es la **fuente de verdad permanente** para cualquier agente o sesi�
 - **Idioma:** Interfaz de usuario y documentación en español natural; identificadores de código, nombres de archivos y mensajes de commit en inglés.
 - **Git:** Rama principal `main`, Conventional Commits (`chore:`, `docs:`, `feat:`, `fix:`, `test:`, `refactor:`). Commits reales, atómicos y revisados antes de confirmar (`git status` + revisión de ausencia de secretos). Nunca crear commits vacíos ni historiales artificiales.
 
-## 7. Pruebas, Documentación Automática y Veracidad
-- **Validaciones mínimas por fase:** `npm run lint`, `npm run typecheck`, `npm run test`, `npm run build` y verificación visual/responsive en navegador.
-- **Documentación viva obligatoria:** Mantener actualizados `README.md`, `VIBE_CODING.md`, `docs/ARCHITECTURE.md`, `docs/TESTING.md`, `docs/prompts/` y `docs/screenshots/` conforme avanza cada fase.
+## 7. Pruebas, Documentación Automática, Walkthroughs y Veracidad
+- **Validaciones mínimas por fase:** `npm run lint`, `npm run typecheck`, `npm run test`, `npm run build` y verificación visual/responsive en navegador (agente de navegador de Antigravity o Playwright con Chromium aislado).
+- **Documentación viva obligatoria:** Mantener actualizados `README.md`, `VIBE_CODING.md`, `docs/ARCHITECTURE.md`, `docs/TESTING.md`, `docs/prompts/`, `docs/walkthroughs/` y `docs/screenshots/` conforme avanza cada fase.
+- **Walkthrough obligatorio por fase:** Al finalizar cada fase se debe generar el artefacto nativo `walkthrough.md` de Antigravity y conservar una copia versionada en `docs/walkthroughs/` (ej. `002-initialization-and-design.md`, `003-database-and-authentication.md`) con enlaces relativos a archivos, capturas reales, grabaciones si existen, commits y pasos de reproducción. El Walkthrough complementa y no sustituye a `VIBE_CODING.md`.
 - **Prohibición estricta de inventar evidencias:** Nunca inventar prompts, errores, pruebas, resultados, capturas, métricas de usuarios ni commits. Reportar siempre el estado real (`Implementado`, `Verificado`, `Preliminar`, `Pendiente` o `Bloqueado`).
 
 ## 8. Autonomía e Intervención Humana
