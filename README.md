@@ -2,53 +2,47 @@
 
 Aplicación web SaaS de gestión de finanzas personales construida con **Next.js 16 (App Router)**, **React 19**, **TypeScript estricto**, **Tailwind CSS v4**, **shadcn/ui**, **Recharts** y **Supabase**, desarrollada mediante la metodología **Vibe Coding** (desarrollo iterativo guiado por IA).
 
-> **Estado actual:** **Fase 02 implementada y validada técnicamente** (con verificación visual automatizada en Chrome pendiente de habilitar depuración remota). Incluye Next.js 16.4.6, sistema de diseño *Refined Emerald Fintech*, landing page pública, interfaces de autenticación con React Hook Form + Zod, AppShell responsive, 6 módulos financieros preliminares con datos de demostración coherentes y 18/18 pruebas unitarias en Vitest. La autenticación real y base de datos Supabase se integrarán en la Fase 03, y el CRUD/APIs en la Fase 04.
+> **Estado actual:** **Fase 02 verificada al 100%** (incluyendo auditoría Playwright en 7 resoluciones y 11 capturas reales) y **Fase 03 implementada y verificada localmente** (migraciones PostgreSQL + RLS, tipos `database.ts`, Supabase SSR con `src/proxy.ts`, autenticación real `/login`, `/register`, `/auth/callback`, protección de rutas, `/api/profile` y `/api/auth/signout`). Pendiente únicamente configurar el proyecto gratuito de Supabase en `.env.local` y aplicar `supabase/phase-03-setup.sql` para ejecutar las pruebas en vivo de RLS de 2 usuarios (`npm run test:supabase-rls`).
 
 ---
 
-## Características Principales
+## Características
 
-- **Landing Page (`/`)**: Presentación de producto, funcionalidades, flujo de uso, principios de privacidad y accesos directos.
-- **Autenticación (`/login`, `/register`)**: Formularios accesibles con React Hook Form + Zod (integración real con Supabase Auth en Fase 03).
-- **Dashboard (`/dashboard`)**: KPIs financieros (balance acumulado, ingresos, gastos, flujo neto), evolución mensual, distribución de gastos por categoría y movimientos recientes.
-- **Transacciones (`/transactions`)**: Buscador, filtros por tipo y categoría, vista tabular responsive y formulario modal de registro.
-- **Categorías (`/categories`)**: Organización por ingresos y gastos, paleta de colores, catálogo de iconos Lucide y borrado seguro (`HTTP 409` en Fase 04).
-- **Presupuestos (`/budgets`)**: Seguimiento mensual por categoría de gasto con barras de progreso, advertencias (`>= 80%`) y alertas críticas (`>= 100%`).
-- **Reportes (`/reports`)**: Comparaciones mensuales, tendencia ingresos vs. gastos, distribución y vista de exportación CSV.
-- **Configuración (`/settings`)**: Información de perfil, moneda USD, zona horaria `America/El_Salvador` y gestión de sesión.
+- **Landing Page (`/`)**: Presentación de producto, funcionalidades, flujo de uso, pilares de seguridad y vista previa demostrativa.
+- **Autenticación (`/login`, `/register`, `/auth/callback`)**: Integración real con Supabase SSR por cookies HTTP, formularios React Hook Form + Zod, flujo compatible con confirmación por correo (PKCE/OTP) y protección contra open redirects.
+- **Protección de rutas y perfil (`/dashboard`, `/transactions`, `/categories`, `/budgets`, `/reports`, `/settings`)**: `src/proxy.ts` + verificación autoritativa `getUser()` en servidor, lectura automática de las 12 categorías iniciales sembradas por PostgreSQL en `/categories`, edición de perfil en `/settings` (`PATCH /api/profile`) y cierre de sesión (`POST /api/auth/signout`).
+- **Base de datos PostgreSQL + RLS (`supabase/migrations/`)**: Tablas `profiles`, `categories`, `transactions` y `budgets` con centavos enteros `BIGINT`, FKs compuestas de propietario/tipo, presupuestos exclusivos para gastos, trigger `SECURITY DEFINER` de 12 categorías iniciales y RLS forzado.
 
 ---
 
-## Stack Tecnológico
-
-- **Next.js 16.4.6** (App Router + Turbopack) · **React 19.3.0** · **TypeScript 5** (modo estricto)
-- **Tailwind CSS 4.3.3** · **shadcn/ui (`base-nova`)** · **Lucide React** · **Recharts** · **Sonner**
-- **React Hook Form** · **Zod 4** · **@hookform/resolvers**
-- **Supabase (`@supabase/supabase-js`, `@supabase/ssr`)** *(conexión en Fase 03)*
-- **Vitest** · **ESLint**
-
----
-
-## Instalación y Uso Local
+## Instalación y Configuración Local
 
 ### Requisitos previos
 - **Node.js** `>= 22.0.0` (desarrollado con `v22.19.0`)
 - **npm** `>= 10`
+- Proyecto gratuito en [Supabase](https://supabase.com/) (para autenticación y base de datos en Fase 03+)
 
 ### Pasos
-1. Clona o ubica el repositorio e instala dependencias:
+1. Instala las dependencias:
    ```bash
    npm install
    ```
-2. Crea `.env.local` a partir de la plantilla documentada cuando se habilite la Fase 03 (en Fase 02 la aplicación funciona localmente sin credenciales de Supabase):
+2. Crea `.env.local` a partir de `.env.example`:
    ```bash
    cp .env.example .env.local
    ```
-3. Inicia el servidor de desarrollo:
+3. Completa en `.env.local` los valores de tu proyecto Supabase (**Project Settings → API**):
+   - `NEXT_PUBLIC_SUPABASE_URL`
+   - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
+   - `NEXT_PUBLIC_APP_URL=http://localhost:3000`
+4. Aplica las migraciones en **Supabase Dashboard → SQL Editor** ejecutando el contenido de [`supabase/phase-03-setup.sql`](./supabase/phase-03-setup.sql) (o mediante Supabase CLI usando `supabase/migrations/`).
+5. En **Supabase Dashboard → Authentication → URL Configuration**, configura:
+   - **Site URL:** `http://localhost:3000`
+   - **Redirect URLs:** `http://localhost:3000/auth/callback`
+6. Inicia la aplicación:
    ```bash
    npm run dev
    ```
-4. Abre [http://localhost:3000](http://localhost:3000) en tu navegador.
 
 ### Scripts disponibles
 
@@ -57,18 +51,23 @@ Aplicación web SaaS de gestión de finanzas personales construida con **Next.js
 | `npm run dev` | Inicia el servidor de desarrollo con Turbopack |
 | `npm run build` | Genera el build de producción |
 | `npm run start` | Inicia el servidor de producción |
-| `npm run lint` | Ejecuta ESLint sobre el proyecto |
-| `npm run typecheck` | Verifica tipos con TypeScript (`tsc --noEmit`) |
-| `npm run test` | Ejecuta la suite unitaria de Vitest en modo no interactivo |
+| `npm run lint` | Ejecuta ESLint |
+| `npm run typecheck` | Ejecuta `tsc --noEmit` en modo estricto |
+| `npm run test` | Ejecuta la suite unitaria de Vitest (no interactivo) |
+| `npm run verify:phase02` | Script Playwright de auditoría visual/responsive de Fase 02 |
+| `npm run verify:phase03` | Script Playwright de protección de rutas, APIs JSON y Auth UI |
+| `npm run test:supabase-rls` | Suite de integración real de Auth, constraints PostgreSQL y aislamiento RLS de 2 usuarios (requiere `.env.local`) |
 
 ---
 
 ## Documentación del Proyecto
 
-- [VIBE_CODING.md](./VIBE_CODING.md) — Bitácora real e iterativa del proceso de desarrollo guiado por IA.
-- [AGENTS.md](./AGENTS.md) — Instrucciones permanentes y reglas de ingeniería del proyecto.
-- [docs/IMPLEMENTATION_PLAN.md](./docs/IMPLEMENTATION_PLAN.md) — Plan maestro aprobado en Fase 01.
-- [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) — Arquitectura del sistema y ADRs.
+- [VIBE_CODING.md](./VIBE_CODING.md) — Bitácora real e iterativa del desarrollo guiado por IA.
+- [AGENTS.md](./AGENTS.md) — Instrucciones permanentes y reglas de ingeniería.
+- [docs/walkthroughs/002-initialization-and-design.md](./docs/walkthroughs/002-initialization-and-design.md) — Walkthrough de Fase 02.
+- [docs/walkthroughs/003-database-and-authentication.md](./docs/walkthroughs/003-database-and-authentication.md) — Walkthrough de Fase 03.
+- [docs/IMPLEMENTATION_PLAN.md](./docs/IMPLEMENTATION_PLAN.md) — Plan maestro aprobado y adendas.
+- [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) — Arquitectura, diagramas Mermaid y ADRs.
 - [docs/TESTING.md](./docs/TESTING.md) — Estrategia y resultados reales de pruebas.
 - [docs/prompts/README.md](./docs/prompts/README.md) — Registro íntegro de prompts recibidos.
 

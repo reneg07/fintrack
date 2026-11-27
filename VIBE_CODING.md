@@ -10,27 +10,8 @@ Este documento registra de forma verídica, cronológica e iterativa el proceso 
 - **Fecha real de ejecución:** `2026-11-26`
 - **Prompt recibido:** [docs/prompts/001-master-planning.md](./docs/prompts/001-master-planning.md)
 - **Objetivo:** Inspeccionar el entorno de forma no destructiva, validar compatibilidad del stack tecnológico y elaborar el Implementation Plan completo cubriendo arquitectura, modelo de datos, seguridad, rutas, APIs, diseño, pruebas y cumplimiento académico.
-- **Propuesta inicial:** Arquitectura modular en Next.js 16 (App Router + Route Groups) con Supabase SSR (`proxy.ts`), almacenamiento monetario en centavos enteros (`BIGINT`), integridad referencial compuesta en PostgreSQL y diseño *Refined Emerald Fintech*.
-- **Decisiones técnicas:**
-  1. Usar `npm` como gestor de paquetes (ya instalado en el entorno).
-  2. Incorporar `vitest` como dependencia de desarrollo gratuita para pruebas unitarias de utilidades financieras y esquemas Zod.
-  3. Estandarizar `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` para la clave pública de Supabase.
-  4. Impedir el borrado de categorías con transacciones o presupuestos asociados mediante restricciones FK `ON DELETE RESTRICT` y respuestas HTTP `409 Conflict`.
-  5. Adoptar `AGENTS.md` + `.agents/rules/fintrack-standards.md` siguiendo la documentación oficial de personalización de Antigravity.
-- **Implementaciones realizadas:** Inspección del entorno y elaboración del Implementation Plan completo sin modificar el workspace (manteniéndolo limpio para inicialización en Fase 02).
-- **Archivos relevantes:**
-  - [docs/IMPLEMENTATION_PLAN.md](./docs/IMPLEMENTATION_PLAN.md)
-  - [docs/prompts/001-master-planning.md](./docs/prompts/001-master-planning.md)
-- **Problemas realmente encontrados:**
-  1. `npx --version` dentro del entorno aislado devolvió `npm error code E403`; se verificó con `npx -v` confirmando `npx 10.9.3`.
-  2. `pnpm`, `gh`, `vercel` y `supabase` CLI no estaban instalados globalmente.
-  3. `git init.defaultBranch` no estaba configurado globalmente.
-- **Soluciones implementadas:** Se adoptó `npm` como gestor único, se planificó renombrar/inicializar la rama explícitamente como `main` y usar migraciones SQL versionadas + paneles/integraciones oficiales para Fase 03 y Fase 06.
-- **Iteraciones efectuadas:** 1 iteración de análisis, verificación documental web y aprobación del supervisor.
-- **Comandos ejecutados:** Inspección de directorio (`Get-ChildItem -Force`), verificación de versiones (`node`, `npm`, `npx`, `pnpm`, `git`, `gh`, `vercel`, `supabase`) y lectura de configuración básica de Git.
-- **Pruebas realizadas:** Validación no destructiva del entorno (`DirCount: 0`, `Node.js v22.19.0`, `npm 10.9.3`, `Git 2.43.0.windows.1`).
-- **Resultados verificables:** Entorno apto y Implementation Plan aprobado íntegramente por el supervisor en el Prompt 002.
-- **Referencias a commits:** Sin commits en Fase 01 (el repositorio Git se inicializó en Fase 02).
+- **Decisiones técnicas:** `npm`, `vitest`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, borrado seguro de categorías con HTTP `409 Conflict`, `AGENTS.md` + `.agents/rules/fintrack-standards.md`.
+- **Resultados verificables:** Workspace vacío verificado (`Node.js v22.19.0`, `npm 10.9.3`, `Git 2.43.0.windows.1`) e Implementation Plan aprobado por el supervisor.
 - **Estado final:** **Completada y aprobada**.
 
 ---
@@ -40,77 +21,69 @@ Este documento registra de forma verídica, cronológica e iterativa el proceso 
 - **Identificador de fase:** `Fase 02`
 - **Fecha real de ejecución:** `2026-11-26`
 - **Prompt recibido:** [docs/prompts/002-initialization-and-design.md](./docs/prompts/002-initialization-and-design.md)
-- **Objetivo:** Inicializar Next.js 16 directamente en `C:\xampp\htdocs\vibe_coding` con nombre `fintrack`, instalar y verificar el stack aprobado, configurar Git en `main`, crear las instrucciones permanentes (`AGENTS.md` + `.agents/rules/fintrack-standards.md`) y la documentación base, implementar el sistema de diseño *Refined Emerald Fintech*, construir la landing page `/`, las interfaces de autenticación `/login` y `/register` con React Hook Form + Zod, el AppShell responsive y las 6 vistas preliminares de módulos financieros con datos de demostración matemáticamente consistentes, configurar Vitest y ejecutar las validaciones técnicas y visuales disponibles.
+- **Walkthrough versionado:** [docs/walkthroughs/002-initialization-and-design.md](./docs/walkthroughs/002-initialization-and-design.md)
+- **Implementaciones y validaciones:** Next.js `16.4.6`, React `19.3.0`, TypeScript `5.9.3` estricto, Tailwind CSS `4.3.3`, `shadcn/ui` (`base-nova`), `geist@1.9.2` autoalojada, sistema de diseño *Refined Emerald Fintech* WCAG AA, landing page `/`, formularios `/login` y `/register` con React Hook Form + Zod, AppShell responsive y 6 módulos preliminares sobre `src/lib/demo-data.ts`.
+- **Resolución de pendientes visuales (completada al inicio de Fase 03):** Se incorporó `playwright@1.58.2` (`scripts/verify-phase-02.mjs` + `scripts/run-with-server.mjs`) usando una instancia aislada de navegador para verificar las 9 rutas en 7 resoluciones (`1920x1080` a `360x800`), detectar y corregir 2 desbordamientos horizontales en `/` (`768x1024` y `360x800`) y la ausencia de `<h1>` en `/login` y `/register`, y generar las 11 capturas reales `docs/screenshots/phase-02-*.png` con `0` errores de consola.
+- **Commits principales:** `2f33570`, `cc46c23`, `a32798f`, `6ee5009`, `0e845b9`, `81e3964`, `63ef233`, `404c4a8`, `10f5875`, `78c3aab`, `b5c49f3`, `2092dc4`.
+- **Estado final:** **Completada y verificada integralmente**.
 
-### Versiones realmente instaladas (verificadas en `node_modules`)
-- `next`: `16.4.6` · `react`: `19.3.0` · `react-dom`: `19.3.0`
-- `typescript`: `5.9.3` · `tailwindcss`: `4.3.3` · `@tailwindcss/turbopack`: `4.3.3`
-- `shadcn` CLI: `4.23.1` (`style: base-nova` sobre `@base-ui/react@1.9.0`)
-- `lucide-react`: `1.81.0` · `recharts`: `3.11.1` · `sonner`: `2.0.8` · `geist`: `1.9.2`
-- `@supabase/supabase-js`: `2.119.2` · `@supabase/ssr`: `0.12.7`
-- `zod`: `4.6.7` · `react-hook-form`: `7.92.0` · `@hookform/resolvers`: `7.0.9`
-- `eslint`: `9.39.5` · `eslint-config-next`: `16.4.6` · `vitest`: `5.1.2` · `@types/node`: `22.20.7`
+---
+
+## Fase 03 — Base de Datos, Migraciones, Seguridad y Autenticación
+
+- **Identificador de fase:** `Fase 03`
+- **Fecha real de ejecución:** `2026-11-26`
+- **Prompt recibido:** [docs/prompts/003-database-and-authentication.md](./docs/prompts/003-database-and-authentication.md)
+- **Walkthrough versionado:** [docs/walkthroughs/003-database-and-authentication.md](./docs/walkthroughs/003-database-and-authentication.md)
+- **Objetivo:** Resolver las evidencias visuales pendientes de Fase 02, incorporar la política permanente de Walkthroughs, simplificar la configuración de caché de Next.js 16 para rutas privadas, implementar las migraciones PostgreSQL con restricciones de integridad y RLS, generar los tipos de base de datos, integrar Supabase SSR (`src/proxy.ts`, `client.ts`, `server.ts`, `/auth/callback`), conectar registro/login/logout reales, proteger las 6 rutas privadas, mostrar perfil real y categorías reales y reemplazar los datos de demostración en el área autenticada por estados vacíos honestos.
 
 ### Decisiones técnicas aplicadas
-1. **Contraste WCAG AA en botones y textos de estado:** Se mantuvo `#059669` (`--brand-primary`), `#10251F` (`--brand-dark`), `#34D399` (`--brand-accent`) y `#DC5656` (`--danger`) como paleta base, ajustando `--primary` de botones a `#047857` (ratio 5.48:1 sobre blanco), `--danger-text` a `#B91C1C` y `--warning-text` a `#B45309` para asegurar contraste WCAG AA en texto pequeño.
-2. **Tipografía Geist autoalojada (`geist@1.9.2`):** Al fallar la descarga de `next/font/google` en compilación sin salida a internet, se adoptó el paquete oficial `geist` de Vercel (`geist/font/sans` y `geist/font/mono`), logrando tipografía Geist auténtica con compilación 100% determinista sin depender de red externa.
-3. **Resolución limpia de peer dependencies:** Se actualizó `@types/node` a `^22` (acorde a `Node.js v22.19.0`) para instalar `vitest@5.1.2` sin usar `--force` ni `--legacy-peer-deps`.
-4. **Buenas prácticas web modernas aplicadas:** Atributos `autocomplete="username"`/`"new-password"`/`"name"` y `spellCheck={false}` en autenticación; `aria-invalid` explícito y `aria-describedby` condicional en errores; `aria-current="page"` con indicador visual no dependiente solo del color en navegación; regiones de tabla desplazables por teclado (`tabIndex={0}`, `role="region"`).
-5. **Aislamiento de datos de demostración:** Todo dato ficticio vive únicamente en `src/lib/demo-data.ts` y las métricas/gráficos se derivan matemáticamente de un único conjunto de registros en centavos enteros.
+1. **Resolución autónoma de navegador vía Playwright aislado:** Evitó tocar el perfil personal de Chrome o abrir puertos públicos de depuración, permitiendo automatizar pruebas visuales y capturas reales de Fase 02 y Fase 03.
+2. **Simplificación de Next.js 16 (`ADR-009`):** Se eliminaron `cacheComponents: true` y `partialPrefetching: true` de `next.config.ts` y se declaró `export const dynamic = "force-dynamic"` en `src/app/(app)/layout.tsx`, garantizando que las 6 rutas privadas siempre se rendericen dinámicamente (`ƒ`) sin riesgo de fuga entre usuarios mientras `/` permanece estático (`○`).
+3. **Integridad estricta declarativa en PostgreSQL:** Clave única compuesta `UNIQUE (id, user_id, type)` en `categories` referenciada por FKs compuestas `ON DELETE RESTRICT ON UPDATE RESTRICT` en `transactions` y en `budgets` (mediante columna generada `category_type = 'expense'`), más techo monetario `<= 900,000,000,000,000` centavos compatible con `Number.MAX_SAFE_INTEGER`.
+4. **RLS forzado y privilegio mínimo:** `REVOKE ALL FROM PUBLIC, anon`, permisos específicos para `authenticated` (en `profiles` solo `SELECT` y `UPDATE (full_name)`), políticas `SELECT`/`INSERT`/`UPDATE`/`DELETE` con `(SELECT auth.uid()) = user_id` y función `handle_new_user()` (`SECURITY DEFINER`, `SET search_path = ''`, sin permisos ejecutables por `anon`/`authenticated`).
+5. **Defensa en profundidad en autenticación y APIs:** `src/proxy.ts` (`getClaims()`) + `(app)/layout.tsx` (`getUser()`) + `/api/profile` y `/api/auth/signout` (`getUser()`, `isValidSameOrigin()`, Zod, `Cache-Control: no-store, private`) + `sanitizeNextPath()` en `/auth/callback` y `/login`.
+6. **Transición limpia desde datos ficticios:** Eliminados `DEMO_USER` y las vistas ficticias de `(app)/`; `/categories` lee categorías reales vía `getUserCategories()`, `/settings` lee y actualiza `public.profiles` vía `/api/profile`, y `/dashboard`, `/transactions`, `/budgets` y `/reports` muestran estados vacíos reales en `$0.00` hasta la Fase 04.
 
-### Implementaciones realizadas y archivos relevantes
-- **Configuración y entorno:** `package.json`, `package-lock.json`, `next.config.ts`, `tsconfig.json`, `components.json`, `vitest.config.mts`, `.env.example`, `.gitignore`.
-- **Reglas permanentes y documentación:** `AGENTS.md`, `.agents/rules/fintrack-standards.md`, `README.md`, `VIBE_CODING.md`, `docs/IMPLEMENTATION_PLAN.md`, `docs/ARCHITECTURE.md`, `docs/TESTING.md`, `docs/prompts/*`.
-- **Sistema de diseño, utilidades y compartidos:** `src/app/globals.css`, `src/app/layout.tsx`, `src/app/icon.svg`, `src/app/error.tsx`, `src/app/not-found.tsx`, `src/app/loading.tsx`, `src/types/domain.ts`, `src/lib/money.ts`, `src/lib/dates.ts`, `src/lib/category-icons.ts`, `src/lib/demo-data.ts`, `src/components/shared/*` (11 componentes) y `src/components/ui/*` (17 componentes shadcn/ui).
-- **Landing Page (`/`):** `src/app/(marketing)/layout.tsx`, `src/app/(marketing)/page.tsx`, `src/components/marketing/marketing-navbar.tsx`, `src/components/marketing/marketing-footer.tsx`.
-- **Autenticación (`/login`, `/register`):** `src/schemas/auth.schema.ts`, `src/app/(auth)/layout.tsx`, `src/app/(auth)/login/page.tsx`, `src/app/(auth)/register/page.tsx`, `src/components/auth/login-form.tsx`, `src/components/auth/register-form.tsx`.
-- **AppShell y 6 módulos financieros:** `src/app/(app)/layout.tsx`, `src/app/(app)/loading.tsx`, `src/app/(app)/error.tsx`, `src/components/layout/*`, y páginas/vistas de `/dashboard`, `/transactions`, `/categories`, `/budgets`, `/reports` y `/settings`.
-- **Pruebas unitarias:** `tests/money.test.ts`, `tests/dates.test.ts`, `tests/auth-schema.test.ts`, `tests/demo-data.test.ts`.
+### Archivos relevantes creados o modificados
+- **Migraciones SQL:** `supabase/migrations/20261126230000_initial_schema.sql`, `supabase/migrations/20261126230100_rls_and_seed.sql`, `supabase/phase-03-setup.sql`.
+- **Supabase SSR y Seguridad:** `src/types/database.ts`, `src/lib/supabase/{env.ts, client.ts, server.ts, proxy.ts}`, `src/proxy.ts`, `src/lib/{redirects.ts, auth-errors.ts, api-response.ts}`.
+- **Servicios, Esquemas y Route Handlers:** `src/schemas/profile.schema.ts`, `src/services/{profile.service.ts, categories.service.ts}`, `src/app/auth/callback/route.ts`, `src/app/api/auth/signout/route.ts`, `src/app/api/profile/route.ts`.
+- **UI autenticada y protección de rutas:** `src/app/(auth)/{layout.tsx, login/page.tsx}`, `src/components/auth/{login-form.tsx, register-form.tsx}`, `src/app/(app)/{layout.tsx, dashboard/page.tsx, transactions/page.tsx, categories/page.tsx, budgets/page.tsx, reports/page.tsx, settings/page.tsx}`, `src/components/layout/{app-sidebar.tsx, app-header.tsx}`, `src/components/settings/settings-view.tsx`, `src/components/categories/categories-view.tsx`.
+- **Pruebas y scripts:** `tests/security-helpers.test.ts`, `scripts/{run-with-server.mjs, verify-phase-02.mjs, verify-phase-03.mjs, test-supabase-rls.mjs}`.
+- **Documentación y Walkthroughs:** `AGENTS.md`, `.agents/rules/fintrack-standards.md`, `docs/prompts/003-database-and-authentication.md`, `docs/walkthroughs/{002-initialization-and-design.md, 003-database-and-authentication.md}`, `docs/{ARCHITECTURE.md, IMPLEMENTATION_PLAN.md, TESTING.md}`, `README.md`, `VIBE_CODING.md`.
 
 ### Problemas realmente encontrados y soluciones aplicadas
-1. **`create-next-app` bloqueado en sandbox sin red (`E403`)**: Se reintentó únicamente la instalación de paquetes con acceso de red habilitado (`BypassSandbox`), manteniendo compilación, lint y tests dentro del sandbox estándar.
-2. **Sintaxis `&&` inválida en Windows PowerShell 5.1**: Se reemplazó por `; if ($LASTEXITCODE -eq 0) { ... }`.
-3. **Conflicto `ERESOLVE` al instalar `vitest@5.1.2`**: `create-next-app` fijó `@types/node@^20`, incompatible con el peer optional de `vitest@5.1.2`. Se analizó la causa raíz y se actualizó `@types/node` a `^22.20.7` (igualando `Node.js v22.19.0`), resolviendo el árbol con `0` vulnerabilidades.
-4. **Rama inicial `master` y nombre `vibe_coding`**: Se renombró la rama a `main` (`git branch -M main`) y se actualizó `"name": "fintrack"` en `package.json`.
-5. **Error `TS2737` (literales BigInt `100n`/`0n` en `target: ES2017`) y tipos obsoletos en `.next/types/validator.ts`**: Se sustituyeron por `BigInt(100)` / `BigInt(0)` en `src/lib/money.ts` y se ejecutó `npx next typegen` para regenerar tipos tras mover `/` a `(marketing)/page.tsx`.
-6. **Fallo de `next build` descargando Google Fonts sin red**: Se instaló `geist@1.9.2` (fuente oficial autoalojada) en `src/app/layout.tsx`, logrando compilación 100% exitosa en `3.2s` sin dependencias de red.
-7. **Advertencia de Vite 8 sobre `vitest.config.ts` (CJS + `__dirname`)**: Se migró a `vitest.config.mts` usando `import.meta.dirname`, eliminando todas las advertencias en `npm run test`.
-8. **Bloqueo en conexión del agente de navegador de Antigravity**: Al ejecutar la auditoría en Chrome, la herramienta devolvió `ENOENT: no such file or directory, open 'C:\Users\Soporte\AppData\Local\Google\Chrome\User Data\DevToolsActivePort'` porque la depuración remota de Chrome (`chrome://inspect/#remote-debugging`) no está activada en el equipo anfitrión. Se documentó con transparencia como limitación externa sin inventar capturas ni resultados.
-
-### Iteraciones efectuadas
-1. Inicialización base con `create-next-app@16.4.6` y corrección de rama/paquete/`.gitignore`.
-2. Resolución de peer dependency de `vitest` y alta de 17 componentes `shadcn/ui` (`base-nova`).
-3. Creación de reglas permanentes y estructura documental.
-4. Construcción del sistema de diseño, utilidades puras y 11 componentes reutilizables.
-5. Implementación secuencial de Landing Page, Autenticación, AppShell y los 6 módulos financieros.
-6. Iteración de validación y corrección: primera ejecución de `lint`/`typecheck`/`test`/`build` → corrección de `BigInt`, regeneración `next typegen`, migración a `geist` local y `vitest.config.mts` → segunda ejecución 100% limpia (`EXIT=0`).
-7. Intento de verificación visual en navegador con servidor `npm run dev` activo (`Ready in 1166ms`) y registro del bloqueo externo de Chrome Remote Debugging.
+1. **Desbordamientos responsive detectados en `/` al ejecutar Playwright (`768x1024`: `824px`, `360x800`: `365px`) y `h1Count: 0` en `/login` y `/register`:** Se ajustó `marketing-navbar.tsx` (`lg:flex`), se habilitó `whitespace-normal` + `min-w-0` en el hero y se reemplazó `CardTitle` por `<h1>` en los formularios de autenticación. Verificado en 2ª corrida con `0` desbordamientos.
+2. **Sobrescritura externa de `package.json`:** Durante la instalación de `server-only`, `package.json` había sido guardado con su contenido inicial del editor abierto; se detectó de inmediato en el log de `npm`, se restauró íntegramente desde `git show 10f5875:package.json`, se añadieron `server-only` y `playwright` y se reinstaló con `0 vulnerabilities`.
+3. **Rutas `(app)/*` marcadas como estáticas (`○`) durante `next build` cuando `.env.local` aún no existía:** Se agregó `export const dynamic = "force-dynamic"` en `src/app/(app)/layout.tsx`, garantizando que las 6 rutas privadas aparezcan como `ƒ (Dynamic)` en compilación independientemente de las variables de entorno.
+4. **Advertencia ESLint de variable sin uso `userB` en `scripts/test-supabase-rls.mjs`:** Corregida para dejar `npm run lint` en `0` errores y `0` advertencias.
+5. **Bloqueo externo esperado — Proyecto remoto de Supabase:** No existe `.env.local`, Supabase CLI ni integración autenticada en el entorno local. Todo el SQL, el código de autenticación SSR y el script automatizado `npm run test:supabase-rls` quedaron listos y verificados localmente; solo falta la intervención humana para crear el proyecto gratuito en Supabase, ejecutar `supabase/phase-03-setup.sql` y completar `.env.local`.
 
 ### Comandos ejecutados y resultados verificables
-- `npx create-next-app@latest . --typescript --tailwind --eslint --app --src-dir --import-alias "@/*" --use-npm --yes` → Exitoso (`next@16.4.6`).
-- `npm install lucide-react recharts @supabase/supabase-js @supabase/ssr zod react-hook-form @hookform/resolvers sonner geist` y `npm install -D @types/node@^22 vitest` → Exitoso (`0 vulnerabilities`).
-- `npx shadcn@latest init -d -y` y `npx shadcn@latest add ...` (17 componentes) → Exitoso.
-- `npm audit --audit-level=moderate` → **`found 0 vulnerabilities`** (619 paquetes auditados).
+- `npm run verify:phase02` → **`EXIT=0`** (9/9 rutas HTTP 200, 42/42 sin desbordamiento, 5/5 interactivos OK, 11 capturas PNG, 0 errores consola/página).
 - `npx next typegen` → **`EXIT=0`**.
 - `npm run lint` → **`EXIT=0`** (0 errores, 0 advertencias).
-- `npm run typecheck` → **`EXIT=0`** (TypeScript estricto limpio).
-- `npm run test` → **`EXIT=0`** (**4 archivos, 18/18 pruebas aprobadas** en `985ms`, 0 advertencias).
-- `npm run build` → **`EXIT=0`** (compilación Turbopack en `3.2s`, 12/12 rutas generadas).
-- `npm run dev` → **`Ready in 1166ms`** en `http://localhost:3000`.
-- Verificación visual en navegador y capturas `docs/screenshots/phase-02-*.png` → **Bloqueado** por falta de depuración remota activa en Chrome (`DevToolsActivePort`).
+- `npm run typecheck` → **`EXIT=0`**.
+- `npm run test` → **`EXIT=0`** (**5 archivos, 22/22 tests aprobados** en `1.32s`).
+- `npm run build` → **`EXIT=0`** (Turbopack `2.7s`; `/` estático `○`, las 6 rutas privadas y 3 APIs dinámicas `ƒ`, `Proxy` activo).
+- `npm audit --audit-level=moderate` → **`found 0 vulnerabilities`** (622 paquetes).
+- `npm run verify:phase03` → **`EXIT=0`** (6/6 redirecciones privadas a `/login`, `/api/profile` JSON + `no-store`, `/api/auth/signout` cross-origin `403`, open-redirect bloqueado, 4 capturas `phase-03-*.png`, 0 errores consola/página).
+- `npm run test:supabase-rls` → **Bloqueado / Pendiente** hasta configurar `.env.local` y aplicar `supabase/phase-03-setup.sql` en Supabase.
 
-### Referencias a commits (Fase 02)
-- `2f33570` — `Initial commit from Create Next App` (base generada por CLI)
-- `cc46c23` — `chore: initialize FinTrack Next.js project`
-- `a32798f` — `docs: establish architecture and vibe coding guidelines`
-- `6ee5009` — `feat: implement FinTrack design system`
-- `0e845b9` — `feat: build responsive marketing landing page`
-- `81e3964` — `feat: create authentication interfaces`
-- `63ef233` — `feat: implement responsive application shell`
-- `404c4a8` — `feat: scaffold financial module interfaces`
-- `10f5875` — `test: configure testing and validate initial application`
-- *(Seguido del commit de cierre documental `docs: document phase 02 implementation and validation`)*
+### Referencias a commits (Fase 03)
+- `b5c49f3` — `test: complete phase 02 browser and responsive validation`
+- `2092dc4` — `docs: add phase 02 implementation walkthrough`
+- `e85fe1e` — `refactor: simplify authenticated rendering configuration`
+- `cf5c08d` — `feat: add PostgreSQL database migrations`
+- `0ff33dd` — `feat: configure row level security policies`
+- `6d1ee68` — `feat: integrate Supabase SSR authentication`
+- `a71ae55` — `feat: implement user registration and login`
+- `4b5d1ce` — `feat: protect authenticated application routes`
+- `2880ce3` — `feat: integrate user profile and session management`
+- `b55a1d7` — `test: validate authentication and data isolation`
+- *(Seguido del commit documental `docs: document phase 03 implementation and walkthrough`)*
 
-### Estado final de la Fase 02
-- **Implementado y verificado técnicamente** (Next.js 16.4.6, stack completo, 9 rutas, sistema de diseño, reglas permanentes, documentación, 18/18 pruebas unitarias, lint, typecheck, build, dev server y 0 vulnerabilidades).
-- **Bloqueado externamente (solo evidencia visual automatizada):** Verificación en vivo con el agente de navegador y generación de capturas PNG en `docs/screenshots/`, pendiente de habilitar depuración remota en Chrome (`chrome://inspect/#remote-debugging`).
+### Estado final de la Fase 03
+- **Implementado y verificado localmente:** 100% de la resolución visual de Fase 02, simplificación de Next.js 16, migraciones PostgreSQL + RLS, tipos `database.ts`, clientes Supabase SSR, `src/proxy.ts`, `/auth/callback`, `/api/auth/signout`, `/api/profile`, autenticación real UI, protección de rutas, perfil real, categorías reales y estados vacíos honestos.
+- **Bloqueado externamente (requiere intervención humana en Supabase):** Creación del proyecto gratuito en Supabase, ejecución del archivo listo `supabase/phase-03-setup.sql`, carga de `.env.local` y ejecución final de `npm run test:supabase-rls` + capturas autenticadas en vivo (`phase-03-authenticated-dashboard.png`, `phase-03-profile.png`, `phase-03-mobile-dashboard.png`).

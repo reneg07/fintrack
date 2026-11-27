@@ -1,82 +1,116 @@
 # Arquitectura de Software — FinTrack
 
-> **Estado actual:** Fase 02 (Inicialización, sistema de diseño y vistas preliminares con datos de demostración aislados). La integración real con Supabase PostgreSQL y autenticación corresponde a la Fase 03, y el CRUD/APIs reales a la Fase 04.
+> **Estado actual:** Fase 03 implementada y verificada localmente (migraciones PostgreSQL, RLS, tipos `database.ts`, clientes Supabase SSR, `src/proxy.ts`, autenticación real `/login`, `/register`, `/auth/callback`, protección de rutas, APIs `/api/profile` y `/api/auth/signout`, estados vacíos honestos en rutas privadas). Aplicación remota de migraciones y verificación en vivo de RLS pendientes de proyecto Supabase autorizado en `.env.local`.
 
-## 1. Visión General
-
-**FinTrack** (*Tus finanzas, bajo control*) es una aplicación web SaaS de gestión de finanzas personales construida con **Next.js 16 (App Router)**, **React 19**, **TypeScript estricto**, **Tailwind CSS v4** y **shadcn/ui** (`base-nova` sobre `@base-ui/react`), preparada para operar con **Supabase** (PostgreSQL + Auth + SSR).
+## 1. Arquitectura de Autenticación y Renderizado (Fase 03)
 
 ```mermaid
 flowchart TD
-    User["Usuario (Desktop / Tablet / Móvil)"]
-    Router["Next.js 16 App Router"]
-    Marketing["(marketing) /"]
-    Auth["(auth) /login, /register"]
-    App["(app) /dashboard, /transactions, /categories, /budgets, /reports, /settings"]
-    UI["Design System (Tailwind v4 + shadcn/ui + Recharts)"]
-    Domain["Utilidades puras (money.ts, dates.ts) + Zod Schemas"]
-    Demo["Datos de demostración centralizados (demo-data.ts) — Solo Fase 02"]
-    Future["Supabase SSR + PostgreSQL + RLS + Route Handlers /api/* — Fases 03-04"]
+    Browser["Navegador / Client Components"]
+    Proxy["src/proxy.ts (Next.js 16 Network Boundary)"]
+    Public["(marketing) / — Static"]
+    AuthUI["(auth) /login, /register + /auth/callback"]
+    AppLayout["(app)/layout.tsx (force-dynamic + getUser())"]
+    API["Route Handlers (/api/profile, /api/auth/signout)"]
+    Services["Server Services (server-only)"]
+    SupaSSR["Supabase SSR Client (Cookies HTTP)"]
+    PG["Supabase PostgreSQL + Auth + RLS"]
 
-    User --> Router
-    Router --> Marketing
-    Router --> Auth
-    Router --> App
-    Marketing --> UI
-    Auth --> UI
-    App --> UI
-    App --> Domain
-    App -.->|"Temporal Fase 02"| Demo
-    App -.->|"Fases 03-04"| Future
+    Browser --> Proxy
+    Proxy -->|"Público"| Public
+    Proxy -->|"Redirige a /dashboard si ya autenticado"| AuthUI
+    Proxy -->|"Verifica JWT vía getClaims(); redirige a /login si sin sesión"| AppLayout
+    Proxy -->|"Nunca redirige HTML; propaga cookies y Cache-Control: no-store"| API
+    AppLayout -->|"Verificación autoritativa getUser()"| Services
+    API -->|"Validación Same-Origin + Zod + getUser()"| Services
+    Services --> SupaSSR
+    SupaSSR -->|"Publishable Key + JWT usuario (sin service_role)"| PG
 ```
 
-## 2. Organización por Route Groups
+## 2. Modelo Entidad-Relación en PostgreSQL (Migraciones Versionadas)
 
-| Route Group | Rutas | Layout | Estado en Fase 02 |
-| :--- | :--- | :--- | :--- |
-| `(marketing)` | `/` | Navbar pública + Footer | Implementado y verificado |
-| `(auth)` | `/login`, `/register` | Panel dividido con identidad FinTrack + formulario accesible | Interfaz y validación Zod implementadas; autenticación real pendiente (Fase 03) |
-| `(app)` | `/dashboard`, `/transactions`, `/categories`, `/budgets`, `/reports`, `/settings` | AppShell responsive (Sidebar 256px desktop, Drawer móvil/tablet, Header) | Interfaz preliminar con datos matemáticos coherentes en `demo-data.ts`; CRUD real y protección de rutas en Fases 03–04 |
+```mermaid
+erDiagram
+    AUTH_USERS ||--|| PROFILES : "1:1 ON DELETE CASCADE"
+    AUTH_USERS ||--o{ CATEGORIES : "1:N ON DELETE CASCADE"
+    AUTH_USERS ||--o{ TRANSACTIONS : "1:N ON DELETE CASCADE"
+    AUTH_USERS ||--o{ BUDGETS : "1:N ON DELETE CASCADE"
+    CATEGORIES ||--o{ TRANSACTIONS : "FK (id, user_id, type) RESTRICT"
+    CATEGORIES ||--o{ BUDGETS : "FK (id, user_id, 'expense') RESTRICT"
 
-## 3. Decisiones de Arquitectura (ADR)
+    PROFILES {
+        uuid id PK, FK
+        text full_name "CHECK length 2..100"
+        text currency "DEFAULT USD"
+        text timezone "DEFAULT America/El_Salvador"
+        timestamptz created_at
+        timestamptz updated_at
+    }
+    CATEGORIES {
+        uuid id PK
+        uuid user_id FK
+        text name "UNIQUE(user_id, type, lower(btrim(name)))"
+        text type "income | expense"
+        text color "HEX ^#[0-9A-Fa-f]{6}$"
+        text icon "Catálogo Lucide verificado"
+        boolean is_default
+        timestamptz created_at
+        timestamptz updated_at
+    }
+    TRANSACTIONS {
+        uuid id PK
+        uuid user_id FK
+        uuid category_id FK
+        text type "income | expense"
+        bigint amount_cents "1..900000000000000"
+        date occurred_on
+        text description "1..200 chars"
+        text notes "NULL | <= 500 chars"
+        timestamptz created_at
+        timestamptz updated_at
+    }
+    BUDGETS {
+        uuid id PK
+        uuid user_id FK
+        uuid category_id FK
+        text category_type "GENERATED ALWAYS AS ('expense')"
+        date month "CHECK day = 1"
+        bigint limit_cents "1..900000000000000"
+        smallint alert_threshold_pct "50..99"
+        timestamptz created_at
+        timestamptz updated_at
+    }
+```
 
-### ADR-001 — Aritmética Monetaria en Centavos Enteros (`src/lib/money.ts`)
-- **Decisión:** Representar y operar todos los importes monetarios en centavos enteros (`number` entero validado contra límites seguros de `Number.MAX_SAFE_INTEGER`) y parsear cadenas decimales sin pasar por multiplicación flotante imprecisa (`parseDollarsToCents`).
-- **Motivo:** Evitar errores clásicos de IEEE-754 (p. ej. `19.99 * 100 === 1998.9999999999998`) y alinear el frontend con columnas `BIGINT` en PostgreSQL.
+## 3. Índices Justificados (`20261126230000_initial_schema.sql`)
 
-### ADR-002 — Zona Horaria Determinista `America/El_Salvador` (`src/lib/dates.ts`)
-- **Decisión:** Resolver fechas calendario (`YYYY-MM-DD`), mes actual (`YYYY-MM`) y formateo en español (`es-SV`) explícitamente contra `America/El_Salvador` (UTC-6, sin DST).
-- **Motivo:** Evitar desfases de día o mes en transacciones registradas en horario nocturno local frente a servidores en UTC.
+| Índice | Tabla y Columnas | Consulta que optimiza |
+| :--- | :--- | :--- |
+| `idx_categories_unique_name` | `categories (user_id, type, lower(btrim(name)))` | Unicidad de nombre insensible a mayúsculas/espacios por usuario y tipo |
+| `idx_categories_user_type` | `categories (user_id, type)` | Listado de categorías separado por ingresos y gastos |
+| `idx_transactions_user_occurred_on` | `transactions (user_id, occurred_on DESC, created_at DESC)` | Historial paginado y recientes del dashboard |
+| `idx_transactions_user_type_occurred_on` | `transactions (user_id, type, occurred_on DESC)` | Agregaciones de ingresos/gastos por período y cálculo de presupuestos |
+| `idx_transactions_category_id` | `transactions (category_id)` | Filtro por categoría y validación rápida de `ON DELETE RESTRICT` |
+| `idx_budgets_user_month` | `budgets (user_id, month)` | Consulta mensual de presupuestos en `/budgets` |
 
-### ADR-003 — Cabeceras de Seguridad y Simplificación de Caché en Next.js 16 (Actualizado en Fase 03 — ver ADR-009)
-- **Decisión inicial (Fase 02):** Se conservaron los defaults del scaffold (`cacheComponents: true`, `partialPrefetching: true`) y se agregaron cabeceras HTTP de seguridad (`X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`) en `next.config.ts`.
-- **Revisión (Fase 03 — ADR-009):** Se deshabilitaron `cacheComponents` y `partialPrefetching` antes de introducir Supabase Auth y datos financieros privados.
+## 4. Estrategia de Confirmación por Correo y Redirecciones (`/auth/callback`)
 
-### ADR-009 — Renderizado Dinámico por Petición sin `cacheComponents` en Rutas Autenticadas (Fase 03)
-- **Contexto:** Next.js 16.4.6 habilita `cacheComponents: true` y `partialPrefetching: true` por defecto en `create-next-app`. Sin embargo, en FinTrack el 100% del área privada (`/dashboard`, `/transactions`, `/categories`, `/budgets`, `/reports`, `/settings`) y los Route Handlers (`/api/*`) dependen de cookies de sesión de usuario y datos financieros estrictamente privados.
-- **Decisión:** Eliminar `cacheComponents: true` y `partialPrefetching: true` de `next.config.ts`, adoptando el modelo clásico y estable del App Router de Next.js 16:
-  - Las páginas públicas (`/`, `/login`, `/register`) continúan prerenderizándose estáticamente (`○ Static`) sin pérdida de rendimiento.
-  - El layout privado `(app)/layout.tsx` y las rutas autenticadas leen `cookies()` dinámicamente por petición (`ƒ Dynamic`) con verificación autoritativa `supabase.auth.getUser()`, evitando cualquier riesgo de compartir datos entre usuarios o fallos de compilación por lecturas fuera de `<Suspense>`.
-  - Todos los Route Handlers privados envían `Cache-Control: no-store, private` y `Vary: Cookie`.
-- **Beneficio:** Arquitectura más simple, predecible y segura para un SaaS financiero multiusuario.
+- **Confirmación habilitada (recomendada para producción):** `supabase.auth.signUp` crea el usuario sin sesión activa; `RegisterForm` muestra una pantalla clara de verificación de correo. El enlace enviado apunta a `/auth/callback?next=/dashboard`, donde se intercambia el `code` (PKCE) o `token_hash`+`type` (OTP) por cookies HTTP seguras.
+- **Confirmación deshabilitada (opcional en pruebas académicas controladas):** Si el supervisor la desactiva temporalmente en Supabase Auth, `signUp` devuelve sesión activa inmediata y redirige a `/dashboard`. No se desactiva silenciosamente en producción.
+- **Prevención de Open Redirects:** `sanitizeNextPath` (`src/lib/redirects.ts`) rechaza URLs absolutas, `//`, `\`, esquemas `http:`/`javascript:` y rutas fuera de los 6 prefijos privados de FinTrack.
+- **Configuración en Supabase Dashboard (Auth → URL Configuration):**
+  - **Site URL (local):** `http://localhost:3000`
+  - **Redirect URLs (local):** `http://localhost:3000/auth/callback`
+  - **Configuración futura en Vercel (Fase 06):** Actualizar **Site URL** a `https://<tu-app>.vercel.app` y agregar `https://<tu-app>.vercel.app/auth/callback` en Redirect URLs.
 
-### ADR-004 — Resolución Limpia de `@types/node` para Vitest 5
-- **Decisión:** Actualizar `@types/node` a `^22` para coincidir con el runtime real (`Node.js v22.19.0`) y satisfacer la peer dependency de `vitest@5.1.2` sin recurrir a `--force` ni `--legacy-peer-deps`.
+## 5. Registro de Decisiones de Arquitectura (ADR)
 
-### ADR-005 — shadcn/ui `base-nova` sobre `@base-ui/react`
-- **Decisión:** Utilizar los componentes modernos generados por `shadcn@4.23.1` sobre `@base-ui/react` con soporte nativo para React 19 y Tailwind CSS v4 (usando prop `render` en triggers en lugar del patrón heredado `asChild`).
-
-### ADR-006 — Aislamiento Temporal de Datos de Demostración
-- **Decisión:** Centralizar todos los datos ficticios de Fase 02 en `src/lib/demo-data.ts`, calculando dinámicamente totales, balances, series gráficas y porcentajes de presupuesto a partir de un único conjunto coherente de transacciones y presupuestos.
-- **Motivo:** Garantizar exactitud matemática en la demostración y facilitar la sustitución limpia por servicios de Supabase en las Fases 03 y 04.
-
-### ADR-007 — Tipografía Geist Autoalojada (`geist@1.9.2`)
-- **Decisión:** Sustituir la descarga remota de `next/font/google` por el paquete oficial autoalojado `geist` (`geist/font/sans` y `geist/font/mono`).
-- **Motivo:** Garantizar compilación determinista de `next build` en entornos sin salida externa a `fonts.googleapis.com` conservando la tipografía Geist oficial y números tabulares (`Geist Mono`).
-
-### ADR-008 — Contraste WCAG AA en Botones y Mensajes de Estado
-- **Decisión:** Mantener `#059669`, `#10251F`, `#34D399` y `#DC5656` como identidad visual base y ajustar `--primary` de botones a `#047857` (contraste 5.48:1 con texto blanco), `--danger-text` a `#B91C1C` y `--warning-text` a `#B45309` para garantizar accesibilidad WCAG AA en texto normal y pequeño.
-
-## 4. Modelo de Datos y Contratos API (Planificados para Fases 03 y 04)
-
-El diseño completo del modelo entidad-relación (tablas `profiles`, `categories`, `transactions`, `budgets`, claves foráneas compuestas `(id, user_id, type)` y políticas RLS) y los 11 endpoints `/api/*` se encuentran especificados en [IMPLEMENTATION_PLAN.md](./IMPLEMENTATION_PLAN.md).
+- **ADR-001:** Aritmética monetaria exclusivamente en centavos enteros (`BIGINT`, techo `900,000,000,000,000` compatible con `Number.MAX_SAFE_INTEGER`).
+- **ADR-002:** Zona horaria determinista `America/El_Salvador` y fechas calendario `DATE`.
+- **ADR-003 / ADR-009:** Eliminación de `cacheComponents` y `partialPrefetching` en `next.config.ts` + `export const dynamic = "force-dynamic"` en `(app)/layout.tsx` y `Cache-Control: no-store, private` en Route Handlers, garantizando que nunca se cacheen vistas o respuestas privadas entre usuarios mientras `/` permanece estático.
+- **ADR-004:** Actualización limpia de `@types/node@^22` alineada con `Node.js v22.19.0` para compatibilidad sin `--force` con `vitest@5.1.2`.
+- **ADR-005:** `shadcn/ui` (`base-nova` sobre `@base-ui/react@1.9.0`) nativo para React 19 y Tailwind CSS v4.
+- **ADR-006:** Transición de `demo-data.ts`: restringido exclusivamente a la vista previa claramente etiquetada en `/` y pruebas unitarias; las rutas autenticadas muestran estados vacíos reales y categorías reales de PostgreSQL.
+- **ADR-007:** Tipografía `Geist` autoalojada (`geist@1.9.2`) para compilación determinista sin red externa.
+- **ADR-008:** Contraste WCAG AA ajustado (`--primary: #047857`, `--danger-text: #B91C1C`, `--warning-text: #B45309`).
+- **ADR-010:** Defensa en profundidad en autenticación: `src/proxy.ts` (`getClaims()`) + `(app)/layout.tsx` (`getUser()`) + Route Handlers (`getUser()` + validación `Origin` Same-Origin) + RLS forzado y privilegios mínimos (`REVOKE ALL FROM PUBLIC, anon`) en PostgreSQL.
