@@ -550,3 +550,13 @@ Durante la ejecución autorizada de la Fase 04 (`PROMPT-004`) se concretaron los
 3. **Presupuestos de 4 Estados:** Extensión de `BudgetStatus` y `BudgetProgress` con el estado exacto `"limit_reached"` (`100.0%` exacto) adicional a `"healthy"`, `"warning"` y `"exceeded"`.
 4. **Orden Defensivo de Route Handlers:** Todos los 9 Route Handlers financieros nuevos validan `isValidSameOrigin` (en mutaciones) → `requireAuthenticatedContext()` (`401`) → validación de parámetros/cuerpo Zod (`400`) antes de invocar los servicios.
 5. **Comparativas Seguras sin Base Cero:** `calculateComparisonPercentage` devuelve `null` cuando el período previo suma `0`, mostrando la etiqueta honesta `"Sin base previa"` en `/reports`.
+
+
+---
+
+## Adenda Fase 06 — Despliegue en Producción y Cierre Académico (2026-11-27)
+
+- **Repositorio público:** https://github.com/reneg07/fintrack (`HTTP 200`, rama `main`).
+- **Producción (Vercel Hobby):** https://fintrack-ten-weld-84.vercel.app (conectado a Supabase PostgreSQL real con `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` y `NEXT_PUBLIC_APP_URL`; sin `service_role` ni variables QA).
+- **Verificación real en producción (`npm run verify:prod`):** `15/15` comprobaciones aprobadas (`401` API sin sesión, acceso público `/`, login QA, CRUD transacción, categorías, presupuestos, reportes + descarga CSV real con BOM, perfil, móvil `390×844` sin desbordamiento, limpieza y signout, `0` errores).
+- **Pendiente documentado:** Custom SMTP no configurado (se mantienen `Confirm email` y RLS activos).

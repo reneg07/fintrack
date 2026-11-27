@@ -1,7 +1,7 @@
 # Matriz de Cumplimiento Académico — FinTrack
 
 **Actividad evaluada:** *Implementación de Aplicación Next.js mediante Vibe Coding: Flujo de Desarrollo Guiado por IA*  
-**Estado general al cierre de Fase 05:** `19/21` requisitos técnicos y documentales **Verificados**; `2/21` (`#17` GitHub público y `#21` URL pública en producción) **Pendientes de Fase 06** conforme a autorización de fases.
+**Estado general al cierre de Fase 06:** `21/21` requisitos académicos **Verificados** (con la limitación conocida de Custom SMTP para registro público externo documentada honestamente en `README.md` y `docs/DEPLOYMENT.md`, manteniendo `Confirm email` y RLS activos).
 
 | # | Requisito académico | Estado | Archivo(s) principal(es) | Evidencia concreta | Prueba asociada | Observaciones / Pendiente |
 | :-: | :--- | :--- | :--- | :--- | :--- | :--- |
@@ -21,8 +21,8 @@
 | 14 | **Error UI** | **Verificado** | [`src/app/error.tsx`](../src/app/error.tsx), [`src/app/(app)/error.tsx`](../src/app/(app)/error.tsx), [`src/app/not-found.tsx`](../src/app/not-found.tsx), [`src/components/shared/error-alert.tsx`](../src/components/shared/error-alert.tsx) | Error boundaries + `<ErrorAlert>` con recuperación `Reintentar` sin falsos `$0.00` | `verify:phase05` (simulaciones HTTP `500`, fallo de red y `401`) | Diferencia claramente Vacío vs. Cargando vs. Error |
 | 15 | **Variables de entorno (`.env.local`)** | **Verificado** | `.env.local` (ignorado en [`.gitignore`](../.gitignore)) | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `NEXT_PUBLIC_APP_URL` | `git check-ignore -v .env.local`, `git log --all --stat -- .env.local` (`0`) | Nunca versionado ni expuesto |
 | 16 | **Archivo `.env.example`** | **Verificado** | [`.env.example`](../.env.example) | Plantilla documentada sin secretos reales ni `service_role` | Revisión de archivo y `git ls-files .env.example` | Versionado y limpio |
-| 17 | **Repositorio público en GitHub** | **Pendiente (Fase 06)** | Repositorio Git local listo en rama `main` | Auditoría de historial y secretos limpia (`docs/AUDIT.md`) | `git status`, auditoría de secretos Fase 05 | Crear repo público y ejecutar `git push` al autorizarse Fase 06 |
+| 17 | **Repositorio público en GitHub** | **Verificado** | https://github.com/reneg07/fintrack | `HEAD https://github.com/reneg07/fintrack` → `HTTP 200` público sin autenticación; historial completo en `main` | Verificación HTTP pública + auditoría de secretos | `.env.local` excluido, `.env.example` versionado |
 | 18 | **Historial iterativo de commits** | **Verificado** | Historial Git en `main` | >25 commits atómicos con Conventional Commits (`feat:`, `fix:`, `perf:`, `test:`, `docs:`, `chore:`) | `git log --oneline` | Historial 100% real y progresivo |
 | 19 | **`README.md`** | **Verificado** | [`README.md`](../README.md) | Descripción, arquitectura, instalación local, scripts, enlaces a docs y sección de producción | Revisión documental Fase 05 | Agregar enlace público de Vercel en Fase 06 |
 | 20 | **Documento del proceso Vibe Coding** | **Verificado** | [`VIBE_CODING.md`](../VIBE_CODING.md) + [`docs/walkthroughs/`](./walkthroughs) | Bitácora real de las 5 fases con prompts, hallazgos, correcciones y commits | Revisión documental Fase 05 | Complementado con Walkthroughs por fase |
-| 21 | **URL pública de producción** | **Pendiente (Fase 06)** | [`docs/DEPLOYMENT.md`](./DEPLOYMENT.md) | Instalación reproducible `npm ci` + `npm run build` verificada; estrategia Vercel + SMTP documentada | Prueba `npm ci` + `npm run build` en clon limpio | Desplegar en Vercel y completar prueba real SMTP en Fase 06 |
+| 21 | **URL pública de producción** | **Verificado** | https://fintrack-ten-weld-84.vercel.app | Desplegado en Vercel Hobby conectado a Supabase real; `15/15` checks en vivo aprobados (`0` errores) | `PROD_URL=https://fintrack-ten-weld-84.vercel.app npm run verify:prod` | Custom SMTP no configurado (documentado; `Confirm email` y RLS activos) |

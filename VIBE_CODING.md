@@ -193,3 +193,22 @@ Este documento registra de forma verídica, cronológica e iterativa el proceso 
 - **Instalación limpia reproducible:** `git clone` sin `.env.local` → `npm ci` (`621` paquetes, `0 vulnerabilities`) → `npm run build` (`EXIT=0`).
 - **Regresión completa de cierre:** `npm audit` (`0 vulnerabilities`), `test:supabase-rls` (`18/18`), `test:api-security` (`42/42`), `verify:phase04` (`18/18` + `63/63` responsive), `verify:phase03` (`15/15` + `21/21` responsive).
 - **Commits:** `f5e95a2`, `c56dc6d`, `9e5c01e`, `1ffb9e5`, `a58e0e2`, `315f30a`, `c675b63` (+ commit final de documentación de Fase 05).
+
+
+---
+
+## Fase 06 — Publicación en GitHub, Despliegue en Vercel y Cierre Definitivo (`PROMPT-006`, 2026-11-27)
+
+### Prompt y Participación del Usuario
+- Registrado íntegramente en [`docs/prompts/006-deployment-and-delivery.md`](./docs/prompts/006-deployment-and-delivery.md).
+- **Herramienta de IA utilizada a lo largo del proyecto:** Antigravity (agente principal de desarrollo guiado por IA) + supervisión humana del estudiante para decisiones de arquitectura, cuentas externas (Supabase, GitHub, Vercel), credenciales locales y aprobación por fase.
+- **Acciones externas ejecutadas por el usuario:** creación del repositorio público `https://github.com/reneg07/fintrack`, `git push` inicial de `main`, despliegue en Vercel Hobby en `https://fintrack-ten-weld-84.vercel.app` con las 3 variables `NEXT_PUBLIC_*` (`NEXT_PUBLIC_APP_URL` actualizada + Redeploy), y actualización de `Site URL` y `Redirect URLs` en Supabase Auth manteniendo `Confirm email` y RLS activos.
+
+### Validación Real en Producción y Cierre
+- Validaciones locales previas: `npm run lint`, `npm run typecheck`, `npm run test` (`36/36`), `npm run build` (`EXIT=0`, commit `09249fc`).
+- **Smoke test en vivo contra `https://fintrack-ten-weld-84.vercel.app` (`npm run verify:prod`):** **`15/15` aprobados**:
+  - `GET /api/dashboard` sin sesión → `401` + `Cache-Control: no-store`.
+  - Acceso público a `/` (`HTTP 200`, sin muro de Vercel Authentication) y `/register` (`HTTP 200`); redirección de `/dashboard` a `/login`.
+  - Login real con cuenta QA confirmada, lectura real de categorías Supabase, creación de transacción de prueba (`$42.50`) reflejada en `/dashboard`, descarga real de CSV con BOM UTF-8 (`fintrack-transacciones-2026-11-27.csv`), `/budgets`, `/settings`, vista móvil `390×844` con `0px` overflow, limpieza del registro de prueba, cierre de sesión y **`0` errores de consola/página**.
+- **Repositorio público verificado sin autenticación:** `HEAD https://github.com/reneg07/fintrack` → **`HTTP 200`**.
+- **Estado honesto de Custom SMTP:** No configurado antes de la entrega; `Confirm email` y RLS permanecen activos, y la limitación de registro público externo queda documentada en `README.md`, `docs/DEPLOYMENT.md` y el Walkthrough definitivo.

@@ -59,3 +59,13 @@ Este documento registra la estrategia de aseguramiento de calidad y los resultad
 | Regresión Fase 04 E2E + Responsive | `npm run verify:phase04` | **`18/18` E2E + `63/63` responsive con datos reales aprobados (`EXIT=0`)** | **Verificado** |
 | Regresión Fase 03 Auth | `npm run verify:phase03` | **`15/15` flujos autenticados + `21/21` responsive + `0` errores consola/página (`EXIT=0`)** | **Verificado** |
 | Registro público SMTP | Flujo `/register` → buzón externo → `/auth/callback` | Estrategia documentada en `docs/DEPLOYMENT.md`; pendiente de URL pública Vercel y Custom SMTP en Fase 06 | **Pendiente (Fase 06)** |
+
+
+### Fase 06 — Validación Real de Producción y Entrega Final (2026-11-27)
+
+| Categoría | Comando / Objetivo | Resultado real verificado | Estado |
+| :--- | :--- | :--- | :--- |
+| Validaciones locales previas | `npm run lint`, `npm run typecheck`, `npm run test`, `npm run build` | `EXIT=0` (`0` errores, `36/36` unitarias, build Turbopack limpio) | **Verificado** |
+| Acceso público GitHub | `HEAD https://github.com/reneg07/fintrack` | `HTTP 200` público sin autenticación; `.env.local` excluido | **Verificado** |
+| Smoke test en producción Vercel | `PROD_URL=https://fintrack-ten-weld-84.vercel.app npm run verify:prod` | **`15/15` checks aprobados (`EXIT=0`)**: `GET /api/dashboard` anónimo → `401` + `no-store`; `/` y `/register` `HTTP 200`; `/dashboard` anónimo → `/login`; login QA real; `/categories`, crear transacción `$42.50` en Supabase, `/dashboard`, `/budgets`, `/reports` + descarga CSV real con BOM (`fintrack-transacciones-2026-11-27.csv`), `/settings`, móvil `390×844` `0px` overflow, limpieza de transacción temporal, cierre de sesión, **`0` errores consola/página** | **Verificado** |
+| Registro público SMTP externo | Custom SMTP → buzón externo → `/auth/callback` | Custom SMTP no configurado antes de la entrega; `Confirm email` y RLS permanecen activos | **Pendiente (limitación documentada)** |

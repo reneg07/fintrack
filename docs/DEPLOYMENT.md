@@ -1,6 +1,10 @@
-# Guía de Preparación para Despliegue — FinTrack (Fase 06)
+# Guía de Despliegue y Operación — FinTrack (Fase 06)
 
-> **Estado actual:** Preparado y verificado localmente para despliegue en **Vercel + Supabase** (Fase 05). **No se ha publicado todavía el repositorio en GitHub ni se ha desplegado en Vercel** (acciones reservadas para autorización de la Fase 06).
+> **Estado actual:** **Desplegado y verificado en producción.**
+> - **Producción (Vercel):** https://fintrack-ten-weld-84.vercel.app (`15/15` smoke test real aprobado, sin Vercel Authentication wall)
+> - **Repositorio público (GitHub):** https://github.com/reneg07/fintrack (`HTTP 200` público)
+> - **Supabase Auth:** `Site URL` y `Redirect URLs` actualizadas al dominio de producción; **RLS** y **`Confirm email`** activos (`mailer_autoconfirm: false`).
+> - **Custom SMTP:** **No configurado** antes de la entrega académica (el registro público con usuarios externos permanece pendiente de configurar Brevo/SMTP personalizado siguiendo la sección 5).
 
 ---
 
